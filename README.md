@@ -1,4 +1,4 @@
-<img src="https://github.com/sitepack-io/sitepack-cli/blob/main/assets/sitepack-cli-128x128.webp?raw=true" alt="SitePack cli" width="128"/>
+<img src="https://github.com/sitepack-io/sitepack-cli/blob/main/assets/sitepack-cli-256x256.webp?raw=true" alt="SitePack cli" width="128"/>
 
 # SitePack CLI
 <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
