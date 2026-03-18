@@ -1,0 +1,14 @@
+{
+  "name": "sitepack-cli",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "sitepack": "./bin/sitepack.js"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "fs-extra": "^11.2.0",
+    "inquirer": "^9.2.15"
+  }
+}
