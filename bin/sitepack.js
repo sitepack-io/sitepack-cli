@@ -6,6 +6,7 @@ import inquirer from 'inquirer';
 import fs from 'fs-extra';
 import path from 'path';
 import { runCommand } from '../src/utils/command.js';
+import { performLogin, logout, getToken, isTokenValid, whoami } from '../src/utils/auth.js';
 
 const program = new Command();
 
@@ -48,6 +49,88 @@ program
     .name('sitepack')
     .description('SitePack Official CLI - Build your ecosystem' + welcomeArt)
     .version('1.0.0');
+
+// CLI authorization
+program
+    .command('login')
+    .description('Connect the CLI interface with your SitePack account')
+    .action(async () => {
+        try {
+            const token = await performLogin();
+            const scopesInfo = token.scopes && token.scopes.length > 0 ? ' Your scopes: ' + token.scopes.join(', ') : '';
+            console.log(chalk.green('✅ Logged in successfully!' + scopesInfo));
+        } catch (err) {
+            console.error(chalk.red('Authentication failed: ' + err.message));
+        }
+    });
+
+// Logout
+program
+    .command('logout')
+    .description('Disconnect the CLI from your SitePack account')
+    .action(async () => {
+        const token = await getToken();
+        if (!token) {
+            console.log(chalk.yellow('You are not currently logged in.'));
+            return;
+        }
+
+        const answers = await inquirer.prompt([
+            {
+                type: 'confirm',
+                name: 'confirm',
+                message: 'Are you sure you want to log out?',
+                default: false
+            }
+        ]);
+
+        if (!answers.confirm) {
+            console.log(chalk.yellow('Logout canceled.'));
+            return;
+        }
+
+        try {
+            await logout();
+            console.log(chalk.green('✅ Logged out successfully. Your session has been terminated.'));
+        } catch (err) {
+            console.error(chalk.red('Logout failed: ' + err.message));
+        }
+    });
+
+// Whoami
+program
+    .command('whoami')
+    .description('Show the currently logged in user')
+    .action(async () => {
+        const token = await getToken();
+        if (!token) {
+            console.log(chalk.yellow('Not logged in. Use: sitepack login'));
+            return;
+        }
+
+        const isValid = await isTokenValid();
+        if (!isValid) {
+            console.log(chalk.red(`Your session has expired. Please run "sitepack login" to re-authorize.`));
+            return;
+        }
+
+        try {
+            const userInfo = await whoami();
+            if (userInfo) {
+                console.log(chalk.cyan.bold('\n👤 SitePack User Profile\n'));
+                console.log(`${chalk.gray('Name:')} ${chalk.white(userInfo.first_name || 'N/A')} ${chalk.white(userInfo.last_name || 'N/A')}`);
+                console.log(`${chalk.gray('Email:')} ${chalk.white(userInfo.email || 'N/A')}`);
+                if (userInfo.organization) {
+                    console.log(`${chalk.gray('Organization:')} ${chalk.white(userInfo.organization)}`);
+                }
+                console.log('');
+            } else {
+                console.log(chalk.red('Could not retrieve user information from the server.'));
+            }
+        } catch (err) {
+            console.error(chalk.red('Error retrieving user info: ' + err.message));
+        }
+    });
 
 // APP:DEV
 program
@@ -171,5 +254,16 @@ program
 
         console.log(chalk.green.bold(`\nDone! Your theme is in: ${targetDir}\n`));
     });
+
+// Check for authentication and show warning if not logged in
+const skipValidationCommands = [undefined, 'login', 'help', '--help', '-h', '--version', '-V', 'whoami'];
+const currentCommand = process.argv[2];
+
+if (!skipValidationCommands.includes(currentCommand)) {
+    const isValid = await isTokenValid();
+    if (!isValid) {
+        console.log(chalk.yellow('⚠ Warning: No active connection found or your session has expired. Please run "sitepack login" to authorize this CLI.\n'));
+    }
+}
 
 program.parse(process.argv);

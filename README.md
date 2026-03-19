@@ -29,6 +29,26 @@ npx sitepack-cli
 
 <p>&nbsp;</p>
 
+## Authentication
+
+Before you can use most features of the SitePack CLI, you need to authenticate your account.
+
+To log in, run:
+
+```bash
+sitepack login
+```
+
+Follow the link displayed in your terminal to authorize the CLI in your browser.
+
+To check your current authentication status, run:
+
+```bash
+sitepack whoami
+```
+
+<p>&nbsp;</p>
+
 ## Getting Started
 
 ### Initialize a new theme
@@ -65,6 +85,8 @@ sitepack app:dev
 
 | Command | Description |
 | --- | --- |
+| `sitepack login` | Connect the CLI interface with your SitePack account |
+| `sitepack whoami` | Show the currently logged in user |
 | `sitepack app:dev` | Run your app in development mode |
 | `sitepack app:init` | Bootstrap a new SitePack app project |
 | `sitepack theme:init` | Start a new SitePack theme project |
