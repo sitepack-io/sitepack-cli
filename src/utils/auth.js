@@ -8,7 +8,7 @@ import crypto from 'crypto';
 const CONFIG_PATH = path.join(os.homedir(), '.sitepackconfig');
 const PROJECT_CONFIG_PATH = path.join(process.cwd(), 'sitepack.config.json');
 
-async function getBaseUrl() {
+export async function getBaseUrl() {
     if (await fs.pathExists(PROJECT_CONFIG_PATH)) {
         const config = await fs.readJson(PROJECT_CONFIG_PATH);
         return config.base_url || 'https://admin.sitepack.nl';
