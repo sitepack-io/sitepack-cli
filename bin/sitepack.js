@@ -9,6 +9,7 @@ import whoamiCommand from '../src/commands/whoami.js';
 import appDevCommand from '../src/commands/app-dev.js';
 import appInitCommand from '../src/commands/app-init.js';
 import themeInitCommand from '../src/commands/theme-init.js';
+import themeWatchCommand from '../src/commands/theme-watch.js';
 
 const program = new Command();
 
@@ -60,6 +61,7 @@ whoamiCommand(program);
 appDevCommand(program);
 appInitCommand(program);
 themeInitCommand(program);
+themeWatchCommand(program);
 
 // Check for authentication and show warning if not logged in
 const skipValidationCommands = [undefined, 'login', 'help', '--help', '-h', '--version', '-V', 'whoami'];

@@ -1,3 +1,6 @@
 {
-  "base_url": "https://admin.sitepack.nl"
+  "base_url": "https://admin.sitepack.nl",
+  "theme_cdn_url": "https://cdn.sitepack.io/themes",
+  "app_cdn_url": "https://cdn.sitepack.io/apps",
+  "cdn_url": "https://cdn.sitepack.io"
 }
