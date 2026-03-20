@@ -40,7 +40,8 @@ export default function(program) {
                 // 2. Request a new theme in the api
                 spinner.text = 'Requesting new theme from SitePack...';
                 const response = await axios.post(`${baseUrl}/api/console/themes/init`, {
-                    dirname: dirname
+                    dirname: dirname,
+                    name: themeName
                 }, {
                     headers: {
                         'X-SitePack-Access-Token': token.access_token
