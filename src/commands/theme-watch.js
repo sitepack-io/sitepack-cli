@@ -74,7 +74,7 @@ export default function(program) {
                 // theme_cdn_url / uuid / folder / file.ext
                 
                 const url = `${themeCdnUrl}/${uuid}/${relativePath}`.replace(/\\/g, '/');
-                
+
                 try {
                     const form = new FormData();
                     form.append('file', fs.createReadStream(filePath));

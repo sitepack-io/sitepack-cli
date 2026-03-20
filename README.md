@@ -61,6 +61,14 @@ sitepack theme:init
 
 Follow the prompts to name your theme and initialize a Git repository.
 
+### Develop your theme
+
+To watch for changes in the theme directory and sync to SitePack, navigate to your theme directory and run:
+
+```bash
+sitepack theme:watch
+```
+
 ### Bootstrap a new app
 
 To bootstrap a new SitePack app, run:
@@ -90,6 +98,7 @@ sitepack app:dev
 | `sitepack app:dev` | Run your app in development mode |
 | `sitepack app:init` | Bootstrap a new SitePack app project |
 | `sitepack theme:init` | Start a new SitePack theme project |
+| `sitepack theme:watch` | Watch for changes in the theme directory and sync to SitePack |
 | `sitepack --version` | Check the current version of the CLI |
 | `sitepack --help` | Show help for all commands |
 
