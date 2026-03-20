@@ -66,9 +66,34 @@ export default function(program) {
                 ig.add(ignoreContent);
             }
 
+            const allowedTypes = {
+                'png': 'image/png',
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'gif': 'image/gif',
+                'svg': 'image/svg+xml',
+                'webp': 'image/webp',
+                'css': 'text/css',
+                'js': 'application/javascript',
+                'json': 'application/json',
+                'pdf': 'application/pdf',
+                'woff': 'font/woff',
+                'woff2': 'font/woff2',
+                'ttf': 'font/ttf',
+                'otf': 'font/otf',
+                'md': 'text/plain',
+                'twig': 'text/plain'
+            };
+
             const uploadFile = async (filePath) => {
                 const relativePath = path.relative(process.cwd(), filePath);
                 if (ig.ignores(relativePath)) return;
+
+                const ext = path.extname(filePath).slice(1).toLowerCase();
+                if (!allowedTypes[ext]) {
+                    console.log(chalk.yellow(`! Skipping ${relativePath}: file type .${ext} is not supported.`));
+                    return;
+                }
 
                 // POST each file with the access token and x-theme-uuid header (CamelCase)
                 // theme_cdn_url / uuid / folder / file.ext
