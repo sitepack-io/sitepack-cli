@@ -6,14 +6,37 @@ import path from 'path';
 import crypto from 'crypto';
 
 const CONFIG_PATH = path.join(os.homedir(), '.sitepackconfig');
-const PROJECT_CONFIG_PATH = path.join(process.cwd(), 'sitepack.config.json');
+
+async function getConfig() {
+    let currentDir = process.cwd();
+    while (true) {
+        const configPath = path.join(currentDir, 'sitepack.config.json');
+        if (await fs.pathExists(configPath)) {
+            try {
+                return await fs.readJson(configPath);
+            } catch (err) {
+                // If it's invalid JSON, maybe we should stop or keep looking up?
+                // Let's stop as it's found but broken.
+                return {};
+            }
+        }
+        const parentDir = path.dirname(currentDir);
+        if (parentDir === currentDir) {
+            break;
+        }
+        currentDir = parentDir;
+    }
+    return {};
+}
 
 export async function getBaseUrl() {
-    if (await fs.pathExists(PROJECT_CONFIG_PATH)) {
-        const config = await fs.readJson(PROJECT_CONFIG_PATH);
-        return config.base_url || 'https://admin.sitepack.nl';
-    }
-    return 'https://admin.sitepack.nl';
+    const config = await getConfig();
+    return config.base_url || 'https://admin.sitepack.nl';
+}
+
+export async function getThemeCdnUrl() {
+    const config = await getConfig();
+    return config.theme_cdn_url || 'https://cdn.sitepack.io/themes';
 }
 
 export async function saveToken(tokenData) {

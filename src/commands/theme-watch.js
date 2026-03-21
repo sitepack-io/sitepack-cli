@@ -7,7 +7,7 @@ import chokidar from 'chokidar';
 import ignore from 'ignore';
 import { glob } from 'glob';
 import FormData from 'form-data';
-import { getToken, isTokenValid } from '../utils/auth.js';
+import { getToken, isTokenValid, getThemeCdnUrl } from '../utils/auth.js';
 
 export default function(program) {
     program
@@ -43,14 +43,7 @@ export default function(program) {
             }
 
             const token = await getToken();
-            const projectConfigPath = path.resolve(process.cwd(), 'sitepack.config.json');
-            // Actually, sitepack.config.json is usually in the root of the project OR we use the default.
-            // Based on auth.js, it looks for sitepack.config.json in process.cwd().
-            let themeCdnUrl = 'https://cdn.sitepack.io/themes';
-            if (await fs.pathExists(projectConfigPath)) {
-                const config = await fs.readJson(projectConfigPath);
-                themeCdnUrl = config.theme_cdn_url || themeCdnUrl;
-            }
+            const themeCdnUrl = await getThemeCdnUrl();
 
             console.log(chalk.cyan(`Watching theme: ${themeConfig.name || uuid} (${uuid})`));
 
