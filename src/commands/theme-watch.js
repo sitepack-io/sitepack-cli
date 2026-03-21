@@ -124,6 +124,16 @@ export default function(program) {
             // Initial sync
             const spinner = ora('Performing initial sync...').start();
             try {
+                // One-time call to mark start of fresh session
+                const freshUrl = `${themeCdnUrl}/${uuid}/`.replace(/([^:]\/)\/+/g, "$1");
+                await axios.post(freshUrl, {}, {
+                    headers: {
+                        'X-SitePack-Access-Token': token.access_token,
+                        'X-Theme-Uuid': uuid,
+                        'X-Fresh': 'true'
+                    }
+                });
+
                 const files = await glob('**/*', { 
                     nodir: true, 
                     dot: true,
