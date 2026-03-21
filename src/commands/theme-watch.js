@@ -104,16 +104,20 @@ export default function(program) {
                     const form = new FormData();
                     form.append('file', fs.createReadStream(filePath));
 
-                    await axios.post(url, form, {
+                    const response = await axios.post(url, form, {
                         headers: {
                             ...form.getHeaders(),
                             'X-SitePack-Access-Token': token.access_token,
                             'X-Theme-Uuid': uuid
                         }
                     });
-                    console.log(chalk.green(`✓ Synced: ${relativePath}`));
+
+                    const feedback = response.data?.message || '';
+                    console.log(chalk.green(`✓ Synced: ${relativePath}${feedback ? ` (${feedback})` : ''}`));
                 } catch (err) {
-                    console.log(chalk.red(`✗ Failed to sync ${relativePath}: ${err.response?.data?.message || err.message}`));
+                    const serverMessage = err.response?.data?.message || err.response?.data || '';
+                    const errorDetail = typeof serverMessage === 'object' ? JSON.stringify(serverMessage) : serverMessage;
+                    console.log(chalk.red(`✗ Failed to sync ${relativePath}: ${errorDetail || err.message}`));
                 }
             };
 
