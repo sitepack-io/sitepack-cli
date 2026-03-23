@@ -13,7 +13,9 @@ export default function(program) {
     program
         .command('theme:watch')
         .description('Watch for changes in the theme directory and sync to SitePack')
-        .action(async () => {
+        .option('--debug', 'Output full server response')
+        .action(async (options) => {
+            const isDebug = !!options.debug;
             // 1. Check if user is logged in
             const isValid = await isTokenValid();
             if (!isValid) {
@@ -105,9 +107,18 @@ export default function(program) {
                         }
                     });
 
+                    if (isDebug) {
+                        console.log(chalk.gray(`[DEBUG] Response for ${relativePath}:`));
+                        console.log(chalk.gray(JSON.stringify(response.data, null, 2)));
+                    }
+
                     const feedback = response.data?.message || '';
                     console.log(chalk.green(`✓ Synced: ${relativePath}${feedback ? ` (${feedback})` : ''}`));
                 } catch (err) {
+                    if (isDebug && err.response) {
+                        console.log(chalk.gray(`[DEBUG] Error response for ${relativePath}:`));
+                        console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));
+                    }
                     const serverMessage = err.response?.data?.message || err.response?.data || '';
                     const errorDetail = typeof serverMessage === 'object' ? JSON.stringify(serverMessage) : serverMessage;
                     console.log(chalk.red(`✗ Failed to sync ${relativePath}: ${errorDetail || err.message}`));
@@ -119,13 +130,18 @@ export default function(program) {
             try {
                 // One-time call to mark start of fresh session
                 const freshUrl = `${themeCdnUrl}/${uuid}/`.replace(/([^:]\/)\/+/g, "$1");
-                await axios.post(freshUrl, {}, {
+                const freshResponse = await axios.post(freshUrl, {}, {
                     headers: {
                         'X-SitePack-Access-Token': token.access_token,
                         'X-Theme-Uuid': uuid,
                         'X-Fresh': 'true'
                     }
                 });
+
+                if (isDebug) {
+                    console.log(chalk.gray('[DEBUG] Initial sync response:'));
+                    console.log(chalk.gray(JSON.stringify(freshResponse.data, null, 2)));
+                }
 
                 const files = await glob('**/*', { 
                     nodir: true, 
@@ -141,6 +157,10 @@ export default function(program) {
                 }
                 spinner.succeed(chalk.green('Initial sync completed.'));
             } catch (err) {
+                if (isDebug && err.response) {
+                    console.log(chalk.gray('[DEBUG] Initial sync error response:'));
+                    console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));
+                }
                 spinner.fail(chalk.red('Initial sync failed: ' + err.message));
             }
 
