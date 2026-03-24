@@ -51,12 +51,12 @@ export async function getBaseUrl() {
 
 export async function getThemeCdnUrl() {
     const config = await getConfig();
-    return config.theme_cdn_url || 'https://cdn.sitepack.dev/themes';
+    return config.theme_cdn_url || 'https://sync.sitepack.dev/themes';
 }
 
 export async function getAppCdnUrl() {
     const config = await getConfig();
-    return config.app_cdn_url || 'https://cdn.sitepack.dev/apps';
+    return config.app_cdn_url || 'https://sync.sitepack.dev/apps';
 }
 
 export async function saveToken(tokenData) {

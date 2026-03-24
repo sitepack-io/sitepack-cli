@@ -119,11 +119,43 @@ export default function(program) {
                         console.log(chalk.gray(`[DEBUG] Error response for ${relativePath}:`));
                         console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));
                     }
-                    const serverMessage = err.response?.data?.message || err.response?.data || '';
-                    const errorDetail = typeof serverMessage === 'object' ? JSON.stringify(serverMessage) : serverMessage;
-                    console.log(chalk.red(`✗ Failed to sync ${relativePath}: ${errorDetail || err.message}`));
+                    const serverData = err.response?.data;
+                    const serverMessage = serverData?.message || serverData?.error || (typeof serverData === 'string' ? serverData : '');
+                    console.log(chalk.red(`✗ Failed to sync ${relativePath}: ${serverMessage || err.message}`));
                 }
             };
+
+            const deleteFile = async (filePath) => {
+                const relativePath = path.relative(process.cwd(), filePath);
+                if (ig.ignores(relativePath)) return;
+
+                const url = `${themeCdnUrl}/${uuid}/${relativePath}`.replace(/\\/g, '/');
+
+                try {
+                    await axios.delete(url, {
+                        headers: {
+                            'X-SitePack-Access-Token': token.access_token,
+                            'X-Theme-Uuid': uuid
+                        }
+                    });
+
+                    if (isDebug) {
+                        console.log(chalk.gray(`[DEBUG] Response for deleting ${relativePath}:`));
+                    }
+
+                    console.log(chalk.blue(`✓ Deleted: ${relativePath}`));
+                } catch (err) {
+                    if (isDebug && err.response) {
+                        console.log(chalk.gray(`[DEBUG] Error response for deleting ${relativePath}:`));
+                        console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));
+                    }
+                    const serverData = err.response?.data;
+                    const serverMessage = serverData?.message || serverData?.error || (typeof serverData === 'string' ? serverData : '');
+                    console.log(chalk.red(`✗ Failed to delete ${relativePath}: ${serverMessage || err.message}`));
+                }
+            };
+
+            const allowedFolders = ['assets', 'config', 'layouts', 'snippets', 'templates', 'translations'];
 
             // Initial sync
             const spinner = ora('Performing initial sync...').start();
@@ -149,7 +181,13 @@ export default function(program) {
                     ignore: ['node_modules/**', '.git/**'] 
                 });
 
-                const filteredFiles = files.filter(file => !ig.ignores(file));
+                const filteredFiles = files.filter(file => {
+                    if (ig.ignores(file)) return false;
+                    const parts = file.split(path.sep);
+                    if (parts.length === 1) return true;
+                    const rootFolder = parts[0];
+                    return allowedFolders.includes(rootFolder);
+                });
                 
                 for (const file of filteredFiles) {
                     const filePath = path.resolve(process.cwd(), file);
@@ -161,7 +199,9 @@ export default function(program) {
                     console.log(chalk.gray('[DEBUG] Initial sync error response:'));
                     console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));
                 }
-                spinner.fail(chalk.red('Initial sync failed: ' + err.message));
+                const serverData = err.response?.data;
+                const serverMessage = serverData?.message || serverData?.error || (typeof serverData === 'string' ? serverData : '');
+                spinner.fail(chalk.red('Initial sync failed: ' + (serverMessage || err.message)));
             }
 
             // Watch for changes
@@ -169,11 +209,17 @@ export default function(program) {
             
             const queue = new Map();
             const watcher = chokidar.watch('.', {
-                ignored: (path, stats) => {
-                    if (!path || path === '.') return false;
-                    const relativePath = path.startsWith('./') ? path.substring(2) : path;
+                ignored: (filePath, stats) => {
+                    if (!filePath || filePath === '.') return false;
+                    const relativePath = path.relative(process.cwd(), filePath);
                     if (relativePath === '.sitepackignore' || relativePath === 'theme.json') return true;
-                    return ig.ignores(relativePath);
+                    if (ig.ignores(relativePath)) return true;
+
+                    const rootFolder = relativePath.split(path.sep)[0];
+                    if (allowedFolders.includes(rootFolder)) return false;
+
+                    const parts = relativePath.split(path.sep);
+                    return parts.length > 1;
                 },
                 persistent: true,
                 ignoreInitial: true
@@ -205,10 +251,8 @@ export default function(program) {
             });
 
             watcher.on('unlink', (filePath) => {
-                // Handle deletion if needed by the API, but the requirements don't explicitly mention it.
-                // For now, just remove from queue if it was there.
                 queue.delete(path.resolve(filePath));
-                console.log(chalk.yellow(`- File removed: ${filePath} (Syncing deletions not implemented)`));
+                deleteFile(filePath);
             });
 
             // Keep alive

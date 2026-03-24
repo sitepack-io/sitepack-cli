@@ -110,7 +110,9 @@ export default function(program) {
 
                     console.log(chalk.green(`✓ Synced: ${relativePath}`));
                 } catch (err) {
-                    console.log(chalk.red(`✗ Failed to sync ${relativePath}: ${err.response?.data?.message || err.message}`));
+                    const serverData = err.response?.data;
+                    const serverMessage = serverData?.message || serverData?.error || (typeof serverData === 'string' ? serverData : '');
+                    console.log(chalk.red(`✗ Failed to sync ${relativePath}: ${serverMessage || err.message}`));
                     if (isDebug && err.response) {
                         console.log(chalk.gray(`[DEBUG] Error response for ${relativePath}:`));
                         console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));
@@ -131,14 +133,29 @@ export default function(program) {
                             'X-App-Uuid': uuid
                         }
                     });
+
+                    if (isDebug) {
+                        console.log(chalk.gray(`[DEBUG] Response for deleting ${relativePath}:`));
+                    }
+
                     console.log(chalk.blue(`✓ Deleted: ${relativePath}`));
                 } catch (err) {
-                    console.log(chalk.red(`✗ Failed to delete ${relativePath}: ${err.response?.data?.message || err.message}`));
+                    if (isDebug && err.response) {
+                        console.log(chalk.gray(`[DEBUG] Error response for deleting ${relativePath}:`));
+                        console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));
+                    }
+                    const serverData = err.response?.data;
+                    const serverMessage = serverData?.message || serverData?.error || (typeof serverData === 'string' ? serverData : '');
+                    console.log(chalk.red(`✗ Failed to delete ${relativePath}: ${serverMessage || err.message}`));
                 }
             };
 
             const watcher = chokidar.watch('.', {
-                ignored: (path) => ig.ignores(path),
+                ignored: (filePath) => {
+                    if (!filePath || filePath === '.') return false;
+                    const relativePath = path.relative(process.cwd(), filePath);
+                    return ig.ignores(relativePath);
+                },
                 persistent: true,
                 ignoreInitial: true
             });
