@@ -2,102 +2,102 @@ import chalk from 'chalk';
 import inquirer from 'inquirer';
 import fs from 'fs-extra';
 import path from 'path';
+import axios from 'axios';
+import ora from 'ora';
 import { runCommand } from '../utils/command.js';
-
-const welcomeArt = `
-                                                           
-                                                           
-        @@@@@@                                @@@@@        
-        @@@@@@@@@@@   @@@@@@@@@@@@@@@@  @@@@@@@@@@@        
-        @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@        
-        @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@        
-        @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@        
-         @@@@@@@          @@@@@@@          @@@@@@@         
-         @@@@@    @@@@@@    @@@    @@@@@@    @@@@@         
-         @@@@   @@@@@@@@@@   @   @@@@@@@@@@   @@@@         
-        @@@@@  @@@@@@  @@@@     @@@@@@   @@@   @@@@        
-        @@@@   @@@ @    @@@@    @@@ @@    @@@  @@@@        
-        @@@@   @@@      @@@@    @@@@     @@@   @@@@        
-        @@@@@   @@@@@@@@@@@@@@@@@@@@@@@@@@@@  @@@@@        
-         @@@@@    @@@@@@@  @@@@@@  @@@@@@@    @@@@@        
-         @@@@@@            @@@@             @@@@@@         
-          @@@@@@@@@    @@@@@@@@@@@@@     @@@@@@@@          
-            @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@            
-              @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@              
- @@@@@        @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@        @@@@@ 
-  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  
-  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  
-  @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  
-   @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@   
-     @@@@@@@@@ @@@@@@@@@@@@@@@@@@@@@@@@@@@@@  @@@@@@@@     
-               @@@@@@@@@@@@@@@@@@@@@@@@@@@@@               
-                @@@@@@@@@@@@@@@@@@@@@@@@@@@                
-                 @@@@@@@@@@@@@@@@@@@@@@@@@                 
-                   @@@@@@@@@@@@@@@@@@@@@@                  
-                      @@@@@@@@@@@@@@@@                     
-                         @@@@@@@@@                         
-                             @                             
-                                                           
-`;
+import { getToken, getBaseUrl, isTokenValid, whoami } from '../utils/auth.js';
 
 export default function(program) {
     program
         .command('app:init')
-        .description('Bootstrap a new SitePack app project')
+        .description('Start a new SitePack app project')
         .action(async () => {
-            console.log(chalk.cyan(welcomeArt));
-            console.log(chalk.cyan.bold('\n🚀 SitePack App Builder\n'));
-
-            const answers = await inquirer.prompt([
-                { type: 'input', name: 'name', message: 'App name:', default: 'my-app' },
-                { type: 'confirm', name: 'git', message: 'Initialize Git repository?', default: true }
-            ]);
-
-            const targetDir = path.join(process.cwd(), answers.name);
-
-            if (fs.existsSync(targetDir)) {
-                console.log(chalk.red(`Error: Directory ${answers.name} already exists.`));
+            // 1. Check if user is logged in
+            const isValid = await isTokenValid();
+            if (!isValid) {
+                console.log(chalk.red('You must be logged in to initialize an app. Run "sitepack login" first.'));
                 return;
             }
 
-            // Create directory structure for an app
-            const structure = ['src', 'public', 'tests', 'config'];
-            for (const folder of structure) {
-                await fs.ensureDir(path.join(targetDir, folder));
-            }
+            const answers = await inquirer.prompt([
+                { type: 'input', name: 'dirname', message: 'Directory name:', default: 'my-app' },
+                { type: 'input', name: 'appName', message: 'App name:', default: 'My App' }
+            ]);
 
-            // Base app.json or package.json
-            await fs.writeJson(path.join(targetDir, 'package.json'), {
-                name: answers.name,
-                version: "1.0.0",
-                description: "SitePack App",
-                main: "src/index.js",
-                type: "module",
-                scripts: {
-                    "dev": "sitepack app:dev",
-                    "build": "sitepack app:build"
-                },
-                sitepack: {
-                    version: "2026.1"
+            const { dirname, appName } = answers;
+            const spinner = ora('Initializing app...').start();
+            try {
+                const token = await getToken();
+                const baseUrl = await getBaseUrl();
+                const user = await whoami();
+                const targetDir = path.resolve(process.cwd(), dirname);
+
+                if (await fs.pathExists(targetDir)) {
+                    spinner.fail(chalk.red(`Error: Directory "${dirname}" already exists.`));
+                    return;
                 }
-            }, { spaces: 2 });
 
-            // Basic src/index.js
-            await fs.writeFile(path.join(targetDir, 'src/index.js'), "// SitePack App Entry Point\nconsole.log('Hello SitePack!');\n");
+                // 2. Request a new app in the api
+                spinner.text = 'Requesting new app from SitePack...';
+                const response = await axios.post(`${baseUrl}/api/console/apps/init`, {
+                    dirname: dirname,
+                    name: appName
+                }, {
+                    headers: {
+                        'X-SitePack-Access-Token': token.access_token
+                    }
+                });
 
-            console.log(chalk.yellow('🛠 Files created...'));
+                const { uuid } = response.data.app || {};
+                if (!uuid) {
+                    throw new Error('No UUID received from the SitePack API.');
+                }
+                const name = response.data.app?.name || appName;
+                const author = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : null;
 
-            // Use runCommand for Git init
-            if (answers.git) {
+                // 3. Clone the skeleton repository
+                spinner.text = 'Cloning app skeleton...';
+                await runCommand('git', ['clone', 'https://github.com/sitepack-io/sitepack-app-skeleton.git', targetDir]);
+
+                // 4. Modify the app.json file and set the uuid and app name
+                const appJsonPath = path.join(targetDir, 'app.json');
+                if (await fs.pathExists(appJsonPath)) {
+                    const appJson = await fs.readJson(appJsonPath);
+                    appJson.uuid = uuid;
+                    appJson.name = name;
+                    if (author) {
+                        appJson.author = author;
+                    }
+                    await fs.writeJson(appJsonPath, appJson, { spaces: 2 });
+                } else {
+                    // If app.json doesn't exist in the skeleton (unexpected, but handle it)
+                    const appData = {
+                        name: name,
+                        uuid: uuid,
+                        version: "1.0.0",
+                        sitepack_version: "2026.1"
+                    };
+                    if (author) {
+                        appData.author = author;
+                    }
+                    await fs.writeJson(appJsonPath, appData, { spaces: 2 });
+                }
+
+                // Cleanup git history if it was cloned with history
                 try {
-                    process.chdir(targetDir);
-                    await runCommand('git', ['init']);
-                    console.log(chalk.green('✅ Git initialized.'));
+                    await fs.remove(path.join(targetDir, '.git'));
+                    await runCommand('git', ['init'], { cwd: targetDir });
                 } catch (e) {
-                    console.log(chalk.red('⚠ Could not initialize Git. Is Git installed?'));
+                    // Ignore if git operations fail
                 }
-            }
 
-            console.log(chalk.green.bold(`\nDone! Your app is in: ${targetDir}\n`));
+                spinner.succeed(chalk.green(`✅ App initialized successfully in ${dirname}!`));
+                console.log(chalk.cyan(`\nYour new app UUID is: ${uuid}`));
+                console.log(chalk.yellow(`\nNext steps:`));
+                console.log(chalk.white(`  cd ${dirname}`));
+                console.log(chalk.white(`  sitepack app:watch\n`));
+            } catch (err) {
+                spinner.fail(chalk.red('Failed to initialize app: ' + (err.response?.data?.message || err.message)));
+            }
         });
 }

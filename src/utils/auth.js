@@ -9,15 +9,19 @@ const CONFIG_PATH = path.join(os.homedir(), '.sitepackconfig');
 
 async function getConfig() {
     let currentDir = process.cwd();
+    let config = {};
+
+    // 1. Check current and parent directories for sitepack.config.json
     while (true) {
         const configPath = path.join(currentDir, 'sitepack.config.json');
         if (await fs.pathExists(configPath)) {
             try {
-                return await fs.readJson(configPath);
+                config = await fs.readJson(configPath);
+                break;
             } catch (err) {
                 // If it's invalid JSON, maybe we should stop or keep looking up?
                 // Let's stop as it's found but broken.
-                return {};
+                break;
             }
         }
         const parentDir = path.dirname(currentDir);
@@ -26,7 +30,18 @@ async function getConfig() {
         }
         currentDir = parentDir;
     }
-    return {};
+
+    // 2. Check ~/.sitepackconfig and merge it (global config)
+    if (await fs.pathExists(CONFIG_PATH)) {
+        try {
+            const globalConfig = await fs.readJson(CONFIG_PATH);
+            config = { ...globalConfig, ...config };
+        } catch (err) {
+            // Ignore broken global config
+        }
+    }
+
+    return config;
 }
 
 export async function getBaseUrl() {
@@ -36,7 +51,12 @@ export async function getBaseUrl() {
 
 export async function getThemeCdnUrl() {
     const config = await getConfig();
-    return config.theme_cdn_url || 'https://cdn.sitepack.io/themes';
+    return config.theme_cdn_url || 'https://cdn.sitepack.dev/themes';
+}
+
+export async function getAppCdnUrl() {
+    const config = await getConfig();
+    return config.app_cdn_url || 'https://cdn.sitepack.dev/apps';
 }
 
 export async function saveToken(tokenData) {

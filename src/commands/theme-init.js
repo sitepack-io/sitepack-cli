@@ -96,7 +96,6 @@ export default function(program) {
                 console.log(chalk.yellow(`\nNext steps:`));
                 console.log(chalk.white(`  cd ${dirname}`));
                 console.log(chalk.white(`  sitepack theme:watch\n`));
-
             } catch (err) {
                 spinner.fail(chalk.red('Failed to initialize theme: ' + (err.response?.data?.message || err.message)));
             }
