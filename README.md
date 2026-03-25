@@ -21,10 +21,22 @@ Install the SitePack CLI globally using npm:
 npm install -g sitepack-cli
 ```
 
+Or using yarn:
+
+```bash
+yarn global add sitepack-cli
+```
+
 Or run it directly using npx:
 
 ```bash
 npx sitepack-cli
+```
+
+Or using yarn dlx:
+
+```bash
+yarn dlx sitepack-cli
 ```
 
 <p>&nbsp;</p>

@@ -5,6 +5,9 @@
   "bin": {
     "sitepack": "./bin/sitepack.js"
   },
+  "scripts": {
+    "preinstall": "node -e \"if(process.env.npm_execpath && !process.env.npm_execpath.includes('yarn') && !process.env.npm_execpath.includes('npm')) { console.error('Please use npm or yarn to install dependencies'); process.exit(1); }\""
+  },
   "dependencies": {
     "axios": "^1.13.6",
     "chalk": "^5.3.0",
@@ -16,5 +19,6 @@
     "ignore": "^7.0.5",
     "inquirer": "^9.2.15",
     "open": "^11.0.0"
-  }
+  },
+  "packageManager": "yarn@4.9.1"
 }

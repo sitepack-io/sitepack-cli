@@ -2,5 +2,11 @@
 node_modules
 .DS_Store
 assets/.DS_Store
-package-lock.json
 my-theme/
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
