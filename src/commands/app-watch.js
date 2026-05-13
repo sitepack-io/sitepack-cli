@@ -7,6 +7,7 @@ import chokidar from 'chokidar';
 import ignore from 'ignore';
 import FormData from 'form-data';
 import { getToken, isTokenValid, getAppCdnUrl } from '../utils/auth.js';
+import { validateJsonFile } from '../utils/json.js';
 
 export default function(program) {
     program
@@ -87,6 +88,14 @@ export default function(program) {
                 if (!allowedTypes[ext]) {
                     console.log(chalk.yellow(`! Skipping ${relativePath}: file type .${ext} is not supported.`));
                     return;
+                }
+
+                if (ext === 'json') {
+                    const validation = await validateJsonFile(filePath);
+                    if (!validation.isValid) {
+                        console.log(chalk.red(`✗ Syntax error in ${relativePath}: ${validation.error}`));
+                        return;
+                    }
                 }
 
                 const url = `${appCdnUrl}/${uuid}/${relativePath}`.replace(/\\/g, '/');

@@ -6,6 +6,7 @@ import axios from 'axios';
 import ora from 'ora';
 import { runCommand } from '../utils/command.js';
 import { getToken, getBaseUrl, isTokenValid, whoami } from '../utils/auth.js';
+import { selectPartner } from '../utils/partners.js';
 
 export default function(program) {
     program
@@ -18,6 +19,8 @@ export default function(program) {
                 console.log(chalk.red('You must be logged in to initialize a theme. Run "sitepack login" first.'));
                 return;
             }
+
+            const partnerUuid = await selectPartner();
 
             const answers = await inquirer.prompt([
                 { type: 'input', name: 'dirname', message: 'Directory name:', default: 'my-theme' },
@@ -41,7 +44,8 @@ export default function(program) {
                 spinner.text = 'Requesting new theme from SitePack...';
                 const response = await axios.post(`${baseUrl}/api/console/themes/init`, {
                     dirname: dirname,
-                    name: themeName
+                    name: themeName,
+                    partner: partnerUuid
                 }, {
                     headers: {
                         'X-SitePack-Access-Token': token.access_token

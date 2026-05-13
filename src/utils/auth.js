@@ -16,12 +16,15 @@ async function getConfig() {
         const configPath = path.join(currentDir, 'sitepack.config.json');
         if (await fs.pathExists(configPath)) {
             try {
-                config = await fs.readJson(configPath);
-                break;
+                const localConfig = await fs.readJson(configPath);
+                config = { ...localConfig, ...config };
+                // If we found a base_url or access_token, we can stop or keep going?
+                // For now, let's keep the "closest wins" but also allow merging from parents if properties are missing
+                if (config.base_url || config.access_token) {
+                    break;
+                }
             } catch (err) {
-                // If it's invalid JSON, maybe we should stop or keep looking up?
-                // Let's stop as it's found but broken.
-                break;
+                // If it's invalid JSON, keep looking up
             }
         }
         const parentDir = path.dirname(currentDir);
@@ -46,7 +49,7 @@ async function getConfig() {
 
 export async function getBaseUrl() {
     const config = await getConfig();
-    return config.base_url || 'https://admin.sitepack.nl';
+    return config.base_url || config.baseUrl || 'https://admin.sitepack.nl';
 }
 
 export async function getThemeCdnUrl() {
@@ -59,14 +62,50 @@ export async function getAppCdnUrl() {
     return config.app_cdn_url || 'https://sync.sitepack.dev/apps';
 }
 
+export async function getCdnUrl() {
+    const config = await getConfig();
+    return config.cdn_url || 'https://cdn.sitepack.dev';
+}
+
 export async function saveToken(tokenData) {
+    let config = {};
+    if (await fs.pathExists(CONFIG_PATH)) {
+        try {
+            config = await fs.readJson(CONFIG_PATH);
+        } catch (err) {
+            // Ignore broken config
+        }
+    }
+    
+    // Merge new token data with existing config
+    const newConfig = { ...config, ...tokenData };
+    
     // Ensure the token data is saved securely (file permissions)
-    await fs.writeJson(CONFIG_PATH, tokenData, { mode: 0o600 });
+    await fs.writeJson(CONFIG_PATH, newConfig, { mode: 0o600 });
+}
+
+export async function getSelectedPartner() {
+    const config = await getConfig();
+    return config.selected_partner_uuid || null;
+}
+
+export async function saveSelectedPartner(partnerUuid) {
+    let config = {};
+    if (await fs.pathExists(CONFIG_PATH)) {
+        try {
+            config = await fs.readJson(CONFIG_PATH);
+        } catch (err) {
+            // Ignore broken config
+        }
+    }
+    config.selected_partner_uuid = partnerUuid;
+    await fs.writeJson(CONFIG_PATH, config, { mode: 0o600 });
 }
 
 export async function getToken() {
-    if (await fs.pathExists(CONFIG_PATH)) {
-        return await fs.readJson(CONFIG_PATH);
+    const config = await getConfig();
+    if (config.access_token) {
+        return config;
     }
     return null;
 }
@@ -160,7 +199,20 @@ export async function logout() {
     }
     
     if (await fs.pathExists(CONFIG_PATH)) {
-        await fs.remove(CONFIG_PATH);
+        try {
+            const config = await fs.readJson(CONFIG_PATH);
+            const tokenKeys = ['access_token', 'refresh_token', 'expires_at', 'scopes', 'client_id'];
+            tokenKeys.forEach(key => delete config[key]);
+            
+            if (Object.keys(config).length === 0) {
+                await fs.remove(CONFIG_PATH);
+            } else {
+                await fs.writeJson(CONFIG_PATH, config, { mode: 0o600 });
+            }
+        } catch (err) {
+            // If it's broken, just remove it
+            await fs.remove(CONFIG_PATH);
+        }
     }
 }
 

@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import { performLogin } from '../utils/auth.js';
+import { selectPartner } from '../utils/partners.js';
 
 export default function(program) {
     program
@@ -10,6 +11,9 @@ export default function(program) {
                 const token = await performLogin();
                 const scopesInfo = token.scopes && token.scopes.length > 0 ? ' Your scopes: ' + token.scopes.join(', ') : '';
                 console.log(chalk.green('✅ Logged in successfully!' + scopesInfo));
+
+                // After successful login, directly show the choice to select the partner organisation
+                await selectPartner();
             } catch (err) {
                 console.error(chalk.red('Authentication failed: ' + err.message));
             }

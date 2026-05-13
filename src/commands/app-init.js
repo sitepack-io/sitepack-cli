@@ -6,6 +6,7 @@ import axios from 'axios';
 import ora from 'ora';
 import { runCommand } from '../utils/command.js';
 import { getToken, getBaseUrl, isTokenValid, whoami } from '../utils/auth.js';
+import { selectPartner } from '../utils/partners.js';
 
 export default function(program) {
     program
@@ -18,6 +19,8 @@ export default function(program) {
                 console.log(chalk.red('You must be logged in to initialize an app. Run "sitepack login" first.'));
                 return;
             }
+
+            const partnerUuid = await selectPartner();
 
             const answers = await inquirer.prompt([
                 { type: 'input', name: 'dirname', message: 'Directory name:', default: 'my-app' },
@@ -41,7 +44,8 @@ export default function(program) {
                 spinner.text = 'Requesting new app from SitePack...';
                 const response = await axios.post(`${baseUrl}/api/console/apps/init`, {
                     dirname: dirname,
-                    name: appName
+                    name: appName,
+                    partner: partnerUuid
                 }, {
                     headers: {
                         'X-SitePack-Access-Token': token.access_token
