@@ -7,14 +7,14 @@ import { glob } from 'glob';
 import FormData from 'form-data';
 import ignore from 'ignore';
 import inquirer from 'inquirer';
-import { getToken, isTokenValid, getThemeCdnUrl, getSelectedPartner } from '../utils/auth.js';
+import { getToken, isTokenValid, getAppCdnUrl, getSelectedPartner } from '../utils/auth.js';
 import { validateJsonFile } from '../utils/json.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
 
 export default function(program) {
     program
-        .command('theme:publish')
-        .description('Publish the theme to SitePack (full sync and release)')
+        .command('app:publish')
+        .description('Publish the app to SitePack (full sync and release)')
         .option('--debug', 'Output full server response')
         .action(async (options) => {
             const isDebug = !!options.debug;
@@ -22,28 +22,28 @@ export default function(program) {
             // 1. Check if user is logged in
             const isValid = await isTokenValid();
             if (!isValid) {
-                console.log(chalk.red('You must be logged in to publish a theme. Run "sitepack login" first.'));
+                console.log(chalk.red('You must be logged in to publish an app. Run "sitepack login" first.'));
                 return;
             }
 
-            // 2. Check if theme.json exists (Validation step)
-            const themeJsonPath = path.resolve(process.cwd(), 'theme.json');
-            if (!(await fs.pathExists(themeJsonPath))) {
-                console.log(chalk.red('Error: theme.json not found. This command must be run inside a theme directory.'));
+            // 2. Check if app.json exists (Validation step)
+            const appJsonPath = path.resolve(process.cwd(), 'app.json');
+            if (!(await fs.pathExists(appJsonPath))) {
+                console.log(chalk.red('Error: app.json not found. This command must be run inside an app directory.'));
                 return;
             }
 
-            let themeConfig;
+            let appConfig;
             try {
-                themeConfig = await fs.readJson(themeJsonPath);
+                appConfig = await fs.readJson(appJsonPath);
             } catch (err) {
-                console.log(chalk.red('Error reading theme.json: ' + err.message));
+                console.log(chalk.red('Error reading app.json: ' + err.message));
                 return;
             }
 
-            const { uuid } = themeConfig;
+            const { uuid } = appConfig;
             if (!uuid) {
-                console.log(chalk.red('Error: theme.json is missing a "uuid".'));
+                console.log(chalk.red('Error: app.json is missing a "uuid".'));
                 return;
             }
 
@@ -52,7 +52,7 @@ export default function(program) {
                 {
                     type: 'confirm',
                     name: 'confirmPublish',
-                    message: `Are you sure you want to publish theme "${themeConfig.name || uuid}"? (will be live in a few minutes on all sites)`,
+                    message: `Are you sure you want to publish app "${appConfig.name || uuid}"?`,
                     default: false
                 }
             ]);
@@ -63,7 +63,7 @@ export default function(program) {
             }
 
             const token = await getToken();
-            const themeCdnUrl = await getThemeCdnUrl();
+            const appCdnUrl = await getAppCdnUrl();
 
             // 4. Ensure partner is selected
             await ensurePartnerSelected();
@@ -92,11 +92,9 @@ export default function(program) {
                 'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
                 'gif': 'image/gif', 'svg': 'image/svg+xml', 'webp': 'image/webp',
                 'css': 'text/css', 'js': 'application/javascript', 'json': 'application/json',
-                'pdf': 'application/pdf', 'woff': 'font/woff', 'woff2': 'font/woff2',
-                'ttf': 'font/ttf', 'otf': 'font/otf', 'md': 'text/plain', 'twig': 'text/plain'
+                'ttf': 'font/ttf', 'otf': 'font/otf', 'md': 'text/plain', 'twig': 'text/plain',
+                'html': 'text/html'
             };
-
-            const allowedFolders = ['assets', 'config', 'layouts', 'snippets', 'templates', 'translations'];
 
             const uploadFile = async (filePath) => {
                 const relativePath = path.relative(process.cwd(), filePath);
@@ -105,7 +103,7 @@ export default function(program) {
                 const ext = path.extname(filePath).slice(1).toLowerCase();
                 if (!allowedTypes[ext]) return;
 
-                const url = `${themeCdnUrl}/${uuid}/${relativePath}`.replace(/\\/g, '/');
+                const url = `${appCdnUrl}/${uuid}/${relativePath}`.replace(/\\/g, '/');
 
                 const form = new FormData();
                 form.append('file', fs.createReadStream(filePath));
@@ -114,7 +112,7 @@ export default function(program) {
                     headers: {
                         ...form.getHeaders(),
                         'X-SitePack-Access-Token': token.access_token,
-                        'X-Theme-Uuid': uuid,
+                        'X-App-Uuid': uuid,
                         'X-Partner-Uuid': partnerUuid,
                         'X-SitePack-Partner': partnerUuid
                     }
@@ -123,11 +121,11 @@ export default function(program) {
 
             try {
                 // Mark start of fresh session (full sync)
-                const freshUrl = `${themeCdnUrl}/${uuid}/`.replace(/([^:]\/)\/+/g, "$1");
+                const freshUrl = `${appCdnUrl}/${uuid}/`.replace(/([^:]\/)\/+/g, "$1");
                 await axios.post(freshUrl, {}, {
                     headers: {
                         'X-SitePack-Access-Token': token.access_token,
-                        'X-Theme-Uuid': uuid,
+                        'X-App-Uuid': uuid,
                         'X-Partner-Uuid': partnerUuid,
                         'X-SitePack-Partner': partnerUuid,
                         'X-Fresh': 'true'
@@ -140,15 +138,8 @@ export default function(program) {
                     ignore: ['node_modules/**', '.git/**'] 
                 });
 
-                const filteredFiles = files.filter(file => {
-                    if (ig.ignores(file)) return false;
-                    const parts = file.split(path.sep);
-                    if (parts.length === 1) return true;
-                    return allowedFolders.includes(parts[0]);
-                });
-
                 // Validate JSON files before starting
-                for (const file of filteredFiles) {
+                for (const file of files) {
                     if (path.extname(file).toLowerCase() === '.json') {
                         const filePath = path.resolve(process.cwd(), file);
                         const validation = await validateJsonFile(filePath);
@@ -159,7 +150,7 @@ export default function(program) {
                     }
                 }
                 
-                for (const file of filteredFiles) {
+                for (const file of files) {
                     spinner.text = `Syncing ${file}...`;
                     const filePath = path.resolve(process.cwd(), file);
                     await uploadFile(filePath);
@@ -172,14 +163,14 @@ export default function(program) {
                 return;
             }
 
-            // 6. Call new endpoint on the devcdn and wait for response
+            // 6. Call publish endpoint
             const publishSpinner = ora('Publishing new version...').start();
             try {
-                const publishUrl = `${themeCdnUrl}/${uuid}/publish`.replace(/([^:]\/)\/+/g, "$1");
+                const publishUrl = `${appCdnUrl}/${uuid}/publish`.replace(/([^:]\/)\/+/g, "$1");
                 const publishResponse = await axios.post(publishUrl, {}, {
                     headers: {
                         'X-SitePack-Access-Token': token.access_token,
-                        'X-Theme-Uuid': uuid,
+                        'X-App-Uuid': uuid,
                         'X-Partner-Uuid': partnerUuid,
                         'X-SitePack-Partner': partnerUuid
                     }
@@ -192,9 +183,9 @@ export default function(program) {
 
                 const version = publishResponse.data?.version;
                 if (version) {
-                    publishSpinner.succeed(chalk.green(`✅ Theme published successfully! New version: ${version}`));
+                    publishSpinner.succeed(chalk.green(`✅ App published successfully! New version: ${version}`));
                 } else {
-                    publishSpinner.succeed(chalk.green('✅ Theme published successfully!'));
+                    publishSpinner.succeed(chalk.green('✅ App published successfully!'));
                 }
             } catch (err) {
                 const serverData = err.response?.data;

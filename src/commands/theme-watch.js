@@ -7,8 +7,9 @@ import chokidar from 'chokidar';
 import ignore from 'ignore';
 import { glob } from 'glob';
 import FormData from 'form-data';
-import { getToken, isTokenValid, getThemeCdnUrl } from '../utils/auth.js';
+import { getToken, isTokenValid, getThemeCdnUrl, getSelectedPartner } from '../utils/auth.js';
 import { validateJsonFile } from '../utils/json.js';
+import { ensurePartnerSelected } from '../utils/partners.js';
 
 export default function(program) {
     program
@@ -47,6 +48,15 @@ export default function(program) {
 
             const token = await getToken();
             const themeCdnUrl = await getThemeCdnUrl();
+
+            // 3. Ensure partner is selected
+            await ensurePartnerSelected();
+            const partnerUuid = await getSelectedPartner();
+
+            if (!partnerUuid) {
+                console.log(chalk.red('Error: No partner organization selected. Use "sitepack partner:select" to select one.'));
+                return;
+            }
 
             console.log(chalk.cyan(`Watching theme: ${themeConfig.name || uuid} (${uuid})`));
 
@@ -112,7 +122,8 @@ export default function(program) {
                         headers: {
                             ...form.getHeaders(),
                             'X-SitePack-Access-Token': token.access_token,
-                            'X-Theme-Uuid': uuid
+                            'X-Theme-Uuid': uuid,
+                            'X-SitePack-Partner': partnerUuid
                         }
                     });
 
@@ -144,7 +155,8 @@ export default function(program) {
                     await axios.delete(url, {
                         headers: {
                             'X-SitePack-Access-Token': token.access_token,
-                            'X-Theme-Uuid': uuid
+                            'X-Theme-Uuid': uuid,
+                            'X-SitePack-Partner': partnerUuid
                         }
                     });
 
@@ -175,6 +187,7 @@ export default function(program) {
                     headers: {
                         'X-SitePack-Access-Token': token.access_token,
                         'X-Theme-Uuid': uuid,
+                        'X-SitePack-Partner': partnerUuid,
                         'X-Fresh': 'true'
                     }
                 });

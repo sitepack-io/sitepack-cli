@@ -48,7 +48,8 @@ export default function(program) {
                     partner: partnerUuid
                 }, {
                     headers: {
-                        'X-SitePack-Access-Token': token.access_token
+                        'X-SitePack-Access-Token': token.access_token,
+                        'X-SitePack-Partner': partnerUuid
                     }
                 });
 

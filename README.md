@@ -15,7 +15,7 @@ Learn more in the docs: [sitepack.dev](https://sitepack.dev)
 
 ## Installation
 
-Install the SitePack CLI globally using npm:
+Install the SitePack CLI globally using npm or yarn:
 
 ```bash
 npm install -g sitepack-cli
@@ -59,6 +59,36 @@ To check your current authentication status, run:
 sitepack whoami
 ```
 
+To log out and disconnect your account, run:
+
+```bash
+sitepack logout
+```
+
+<p>&nbsp;</p>
+
+## Organizations
+
+Most resources in SitePack (like apps and themes) are owned by an organization (partner). You can register your company as a partner for free in our [partner dashboard](https://sitepack.eu/partners).
+
+To list all organizations you have access to, run:
+
+```bash
+sitepack partner:organisations
+```
+
+To change the active organization you are working with, run:
+
+```bash
+sitepack partner:change-organisation
+```
+
+To create a new organization, run:
+
+```bash
+sitepack partner:create-organisation
+```
+
 <p>&nbsp;</p>
 
 ## Getting Started
@@ -91,12 +121,20 @@ sitepack app:init
 
 This will create a new app structure and a `package.json` file.
 
-### Develop your app
+### Publish your app
 
-To run your app in development mode, navigate to your app directory and run:
+To publish your app to SitePack, run:
 
 ```bash
-sitepack app:dev
+sitepack app:publish
+```
+
+### Checkout an app
+
+To pull an app from SitePack, run:
+
+```bash
+sitepack app:checkout
 ```
 
 <p>&nbsp;</p>
@@ -106,11 +144,17 @@ sitepack app:dev
 | Command | Description |
 | --- | --- |
 | `sitepack login` | Connect the CLI interface with your SitePack account |
+| `sitepack logout` | Disconnect the CLI from your SitePack account |
 | `sitepack whoami` | Show the currently logged in user |
-| `sitepack app:dev` | Run your app in development mode |
-| `sitepack app:init` | Bootstrap a new SitePack app project |
+| `sitepack app:init` | Start a new SitePack app project |
+| `sitepack app:publish` | Publish the app to SitePack (full sync and release) |
+| `sitepack app:checkout` | Pull an app from SitePack to edit files locally |
 | `sitepack theme:init` | Start a new SitePack theme project |
 | `sitepack theme:watch` | Watch for changes in the theme directory and sync to SitePack |
+| `sitepack theme:publish` | Publish the theme to SitePack (full sync and release) |
+| `sitepack partner:organisations` | List all organizations you have access to |
+| `sitepack partner:change-organisation` | Select a different organization to work with |
+| `sitepack partner:create-organisation` | Open the browser to create a new organization |
 | `sitepack --version` | Check the current version of the CLI |
 | `sitepack --help` | Show help for all commands |
 

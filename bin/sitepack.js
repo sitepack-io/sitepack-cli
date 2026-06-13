@@ -6,9 +6,9 @@ import { isTokenValid, whoami, getSelectedPartner } from '../src/utils/auth.js';
 import loginCommand from '../src/commands/login.js';
 import logoutCommand from '../src/commands/logout.js';
 import whoamiCommand from '../src/commands/whoami.js';
-import appDevCommand from '../src/commands/app-dev.js';
 import appInitCommand from '../src/commands/app-init.js';
-import appWatchCommand from '../src/commands/app-watch.js';
+import appPublishCommand from '../src/commands/app-publish.js';
+import appCheckoutCommand from '../src/commands/app-checkout.js';
 import themeInitCommand from '../src/commands/theme-init.js';
 import themeWatchCommand from '../src/commands/theme-watch.js';
 import themePublishCommand from '../src/commands/theme-publish.js';
@@ -95,7 +95,7 @@ async function getWelcomeMessage() {
 program
     .name('sitepack')
     .description('SitePack Official CLI - Build your ecosystem\n\nDocumentation & Examples: https://sitepack.dev/')
-    .version('1.0.0');
+    .version('1.1.0');
 
 // We will add the help text dynamically before parsing
 const welcomeMessage = await getWelcomeMessage();
@@ -106,9 +106,9 @@ program.helpInformation = function() {
 Usage: sitepack [command]
 
 ${chalk.bold('apps')}
-    ${chalk.cyan('app:init')}    - Start a new SitePack app project
-    ${chalk.cyan('app:dev')}     - Run your SitePack app in development mode
-    ${chalk.cyan('app:watch')}   - Watch for changes in the app directory and sync to SitePack
+    ${chalk.cyan('app:init')}      - Start a new SitePack app project
+    ${chalk.cyan('app:publish')}   - Publish the app to SitePack (full sync and release)
+    ${chalk.cyan('app:checkout')}  - Pull an app from SitePack to edit files locally
 
 ${chalk.bold('themes')}
     ${chalk.cyan('theme:init')}    - Start a new SitePack theme project
@@ -137,9 +137,9 @@ Options:
 loginCommand(program);
 logoutCommand(program);
 whoamiCommand(program);
-appDevCommand(program);
 appInitCommand(program);
-appWatchCommand(program);
+appPublishCommand(program);
+appCheckoutCommand(program);
 themeInitCommand(program);
 themeWatchCommand(program);
 themePublishCommand(program);

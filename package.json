@@ -1,6 +1,6 @@
 {
   "name": "sitepack-cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "bin": {
     "sitepack": "./bin/sitepack.js"
@@ -9,7 +9,8 @@
     "preinstall": "node -e \"if(process.env.npm_execpath && !process.env.npm_execpath.includes('yarn') && !process.env.npm_execpath.includes('npm')) { console.error('Please use npm or yarn to install dependencies'); process.exit(1); }\""
   },
   "dependencies": {
-    "axios": "^1.13.6",
+    "adm-zip": "^0.5.17",
+    "axios": "1.15.2",
     "chalk": "^5.3.0",
     "chokidar": "^5.0.0",
     "commander": "^12.0.0",
@@ -18,7 +19,8 @@
     "glob": "^13.0.6",
     "ignore": "^7.0.5",
     "inquirer": "^9.2.15",
-    "open": "^11.0.0"
+    "open": "^11.0.0",
+    "ora": "^8.2.0"
   },
   "packageManager": "yarn@4.9.1"
 }

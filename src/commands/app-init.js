@@ -48,7 +48,8 @@ export default function(program) {
                     partner: partnerUuid
                 }, {
                     headers: {
-                        'X-SitePack-Access-Token': token.access_token
+                        'X-SitePack-Access-Token': token.access_token,
+                        'X-SitePack-Partner': partnerUuid
                     }
                 });
 
@@ -78,8 +79,8 @@ export default function(program) {
                     const appData = {
                         name: name,
                         uuid: uuid,
-                        version: "1.0.0",
-                        sitepack_version: "2026.1"
+                        version: "1",
+                        sitepack_version: "2026.6"
                     };
                     if (author) {
                         appData.author = author;
