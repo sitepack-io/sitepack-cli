@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { isTokenValid, whoami, getSelectedPartner } from '../src/utils/auth.js';
+import { checkForUpdates } from '../src/utils/update.js';
 import loginCommand from '../src/commands/login.js';
 import logoutCommand from '../src/commands/logout.js';
 import whoamiCommand from '../src/commands/whoami.js';
@@ -144,6 +145,9 @@ themeInitCommand(program);
 themeWatchCommand(program);
 themePublishCommand(program);
 partnerCommands(program);
+
+// Check for updates (max once every 10 minutes)
+await checkForUpdates();
 
 // Check for authentication and show warning if not logged in
 const skipValidationCommands = [undefined, 'login', 'help', '--help', '-h', '--version', '-V', 'whoami', 'partner:organisations', 'partner:change-organisation'];

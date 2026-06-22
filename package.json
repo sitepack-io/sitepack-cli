@@ -22,5 +22,5 @@
     "open": "^11.0.0",
     "ora": "^8.2.0"
   },
-  "packageManager": "yarn@4.9.1"
+  "packageManager": "yarn@1.22.22"
 }
