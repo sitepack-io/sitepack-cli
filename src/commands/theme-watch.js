@@ -7,7 +7,7 @@ import chokidar from 'chokidar';
 import ignore from 'ignore';
 import { glob } from 'glob';
 import FormData from 'form-data';
-import { getToken, isTokenValid, getThemeCdnUrl, getSelectedPartner } from '../utils/auth.js';
+import { getToken, isTokenValid, getThemeCdnUrl, getSelectedPartner, callApi } from '../utils/auth.js';
 import { validateJsonFile } from '../utils/json.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
 
@@ -118,10 +118,12 @@ export default function(program) {
                     const form = new FormData();
                     form.append('file', fs.createReadStream(filePath));
 
-                    const response = await axios.post(url, form, {
+                    const response = await callApi({
+                        method: 'post',
+                        url: url,
+                        data: form,
                         headers: {
                             ...form.getHeaders(),
-                            'X-SitePack-Access-Token': token.access_token,
                             'X-Theme-Uuid': uuid,
                             'X-SitePack-Partner': partnerUuid
                         }
@@ -152,9 +154,10 @@ export default function(program) {
                 const url = `${themeCdnUrl}/${uuid}/${relativePath}`.replace(/\\/g, '/');
 
                 try {
-                    await axios.delete(url, {
+                    await callApi({
+                        method: 'delete',
+                        url: url,
                         headers: {
-                            'X-SitePack-Access-Token': token.access_token,
                             'X-Theme-Uuid': uuid,
                             'X-SitePack-Partner': partnerUuid
                         }
@@ -183,9 +186,10 @@ export default function(program) {
             try {
                 // One-time call to mark start of fresh session
                 const freshUrl = `${themeCdnUrl}/${uuid}/`.replace(/([^:]\/)\/+/g, "$1");
-                const freshResponse = await axios.post(freshUrl, {}, {
+                const freshResponse = await callApi({
+                    method: 'post',
+                    url: freshUrl,
                     headers: {
-                        'X-SitePack-Access-Token': token.access_token,
                         'X-Theme-Uuid': uuid,
                         'X-SitePack-Partner': partnerUuid,
                         'X-Fresh': 'true'
@@ -205,6 +209,7 @@ export default function(program) {
 
                 const filteredFiles = files.filter(file => {
                     if (ig.ignores(file)) return false;
+                    if (file === 'theme.json') return true;
                     const parts = file.split(path.sep);
                     if (parts.length === 1) return true;
                     const rootFolder = parts[0];
@@ -234,8 +239,10 @@ export default function(program) {
                 ignored: (filePath, stats) => {
                     if (!filePath || filePath === '.') return false;
                     const relativePath = path.relative(process.cwd(), filePath);
-                    if (relativePath === '.sitepackignore' || relativePath === 'theme.json') return true;
+                    if (relativePath === '.sitepackignore') return true;
                     if (ig.ignores(relativePath)) return true;
+
+                    if (relativePath === 'theme.json') return false;
 
                     const rootFolder = relativePath.split(path.sep)[0];
                     if (allowedFolders.includes(rootFolder)) return false;

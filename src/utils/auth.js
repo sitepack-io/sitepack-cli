@@ -49,7 +49,7 @@ async function getConfig() {
 
 export async function getBaseUrl() {
     const config = await getConfig();
-    return config.base_url || config.baseUrl || 'https://admin.sitepack.nl';
+    return config.base_url || config.baseUrl || 'https://admin.sitepack.eu';
 }
 
 export async function getThemeCdnUrl() {
@@ -104,10 +104,58 @@ export async function saveSelectedPartner(partnerUuid) {
 
 export async function getToken() {
     const config = await getConfig();
-    if (config.access_token) {
+    if (config && config.access_token) {
         return config;
     }
     return null;
+}
+
+/**
+ * Perform an API call with automatic token refresh on 401.
+ * @param {import('axios').AxiosRequestConfig} axiosConfig
+ * @returns {Promise<import('axios').AxiosResponse>}
+ */
+export async function callApi(axiosConfig) {
+    let token = await getToken();
+    if (!token) {
+        throw new Error('Not logged in. Run "sitepack login" first.');
+    }
+
+    // Ensure headers exist
+    axiosConfig.headers = axiosConfig.headers || {};
+
+    // Helper to apply token to headers
+    const applyToken = (t) => {
+        if (axiosConfig.headers['X-SitePack-Access-Token']) {
+            axiosConfig.headers['X-SitePack-Access-Token'] = t.access_token;
+        } else if (axiosConfig.headers['Authorization']) {
+            axiosConfig.headers['Authorization'] = `Bearer ${t.access_token}`;
+        } else {
+            // Default to SitePack header if none specified yet
+            axiosConfig.headers['X-SitePack-Access-Token'] = t.access_token;
+        }
+    };
+
+    applyToken(token);
+
+    try {
+        return await axios(axiosConfig);
+    } catch (error) {
+        if (error.response && error.response.status === 401) {
+            // Token might be expired, try refreshing
+            const newToken = await refreshToken();
+            if (newToken) {
+                applyToken(newToken);
+                // Retry the request once
+                try {
+                    return await axios(axiosConfig);
+                } catch (retryError) {
+                    throw retryError;
+                }
+            }
+        }
+        throw error;
+    }
 }
 
 /**
@@ -165,17 +213,11 @@ export async function isTokenValid() {
 }
 
 export async function whoami() {
-    const token = await getToken();
-    if (!token || !token.access_token) {
-        return null;
-    }
-
-    const baseUrl = await getBaseUrl();
     try {
-        const response = await axios.get(`${baseUrl}/api/authentication/oauth/whoami`, {
-            headers: {
-                'X-SitePack-Access-Token': token.access_token
-            }
+        const baseUrl = await getBaseUrl();
+        const response = await callApi({
+            method: 'get',
+            url: `${baseUrl}/api/authentication/oauth/whoami`
         });
         return response.data;
     } catch (error) {

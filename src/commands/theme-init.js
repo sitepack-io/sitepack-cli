@@ -5,7 +5,7 @@ import path from 'path';
 import axios from 'axios';
 import ora from 'ora';
 import { runCommand } from '../utils/command.js';
-import { getToken, getBaseUrl, isTokenValid, whoami } from '../utils/auth.js';
+import { getToken, getBaseUrl, isTokenValid, whoami, callApi } from '../utils/auth.js';
 import { selectPartner } from '../utils/partners.js';
 
 export default function(program) {
@@ -42,13 +42,15 @@ export default function(program) {
 
                 // 2. Request a new theme in the api
                 spinner.text = 'Requesting new theme from SitePack...';
-                const response = await axios.post(`${baseUrl}/api/console/themes/init`, {
-                    dirname: dirname,
-                    name: themeName,
-                    partner: partnerUuid
-                }, {
+                const response = await callApi({
+                    method: 'post',
+                    url: `${baseUrl}/api/console/themes/init`,
+                    data: {
+                        dirname: dirname,
+                        name: themeName,
+                        partner: partnerUuid
+                    },
                     headers: {
-                        'X-SitePack-Access-Token': token.access_token,
                         'X-SitePack-Partner': partnerUuid
                     }
                 });
@@ -64,7 +66,14 @@ export default function(program) {
                 spinner.text = 'Cloning theme skeleton...';
                 await runCommand('git', ['clone', 'https://github.com/sitepack-io/sitepack-theme-skeleton.git', targetDir]);
 
-                // 4. Modify the theme.json file and set the uuid and theme name
+                // 4. Remove .git directory to unlink from skeleton
+                try {
+                    await fs.remove(path.join(targetDir, '.git'));
+                } catch (e) {
+                    // Ignore if removal fails
+                }
+
+                // 5. Modify the theme.json file and set the uuid and theme name
                 const themeJsonPath = path.join(targetDir, 'theme.json');
                 if (await fs.pathExists(themeJsonPath)) {
                     const themeJson = await fs.readJson(themeJsonPath);
@@ -86,14 +95,6 @@ export default function(program) {
                         themeData.author = author;
                     }
                     await fs.writeJson(themeJsonPath, themeData, { spaces: 2 });
-                }
-
-                // Cleanup git history if it was cloned with history
-                try {
-                    await fs.remove(path.join(targetDir, '.git'));
-                    await runCommand('git', ['init'], { cwd: targetDir });
-                } catch (e) {
-                    // Ignore if git operations fail
                 }
 
                 spinner.succeed(chalk.green(`✅ Theme initialized successfully in ${dirname}!`));

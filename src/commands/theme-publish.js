@@ -7,7 +7,7 @@ import { glob } from 'glob';
 import FormData from 'form-data';
 import ignore from 'ignore';
 import inquirer from 'inquirer';
-import { getToken, isTokenValid, getThemeCdnUrl, getSelectedPartner } from '../utils/auth.js';
+import { getToken, isTokenValid, getThemeCdnUrl, getSelectedPartner, callApi } from '../utils/auth.js';
 import { validateJsonFile } from '../utils/json.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
 
@@ -110,10 +110,12 @@ export default function(program) {
                 const form = new FormData();
                 form.append('file', fs.createReadStream(filePath));
 
-                await axios.post(url, form, {
+                await callApi({
+                    method: 'post',
+                    url: url,
+                    data: form,
                     headers: {
                         ...form.getHeaders(),
-                        'X-SitePack-Access-Token': token.access_token,
                         'X-Theme-Uuid': uuid,
                         'X-Partner-Uuid': partnerUuid,
                         'X-SitePack-Partner': partnerUuid
@@ -124,9 +126,10 @@ export default function(program) {
             try {
                 // Mark start of fresh session (full sync)
                 const freshUrl = `${themeCdnUrl}/${uuid}/`.replace(/([^:]\/)\/+/g, "$1");
-                await axios.post(freshUrl, {}, {
+                await callApi({
+                    method: 'post',
+                    url: freshUrl,
                     headers: {
-                        'X-SitePack-Access-Token': token.access_token,
                         'X-Theme-Uuid': uuid,
                         'X-Partner-Uuid': partnerUuid,
                         'X-SitePack-Partner': partnerUuid,
@@ -176,9 +179,10 @@ export default function(program) {
             const publishSpinner = ora('Publishing new version...').start();
             try {
                 const publishUrl = `${themeCdnUrl}/${uuid}/publish`.replace(/([^:]\/)\/+/g, "$1");
-                const publishResponse = await axios.post(publishUrl, {}, {
+                const publishResponse = await callApi({
+                    method: 'post',
+                    url: publishUrl,
                     headers: {
-                        'X-SitePack-Access-Token': token.access_token,
                         'X-Theme-Uuid': uuid,
                         'X-Partner-Uuid': partnerUuid,
                         'X-SitePack-Partner': partnerUuid

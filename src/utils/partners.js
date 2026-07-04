@@ -2,7 +2,7 @@ import axios from 'axios';
 import inquirer from 'inquirer';
 import open from 'open';
 import chalk from 'chalk';
-import { getBaseUrl, getToken, saveSelectedPartner, getSelectedPartner } from './auth.js';
+import { getBaseUrl, getToken, saveSelectedPartner, getSelectedPartner, callApi } from './auth.js';
 
 export async function getPartners() {
     const baseUrl = await getBaseUrl();
@@ -12,10 +12,9 @@ export async function getPartners() {
         throw new Error('Not logged in. Use "sitepack login" to log in.');
     }
 
-    const response = await axios.get(`${baseUrl}/api/console/partners`, {
-        headers: {
-            'X-SitePack-Access-Token': token.access_token
-        }
+    const response = await callApi({
+        method: 'get',
+        url: `${baseUrl}/api/console/partners`
     });
 
     const partners = response.data.partners || [];

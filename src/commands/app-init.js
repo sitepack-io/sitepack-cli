@@ -5,7 +5,7 @@ import path from 'path';
 import axios from 'axios';
 import ora from 'ora';
 import { runCommand } from '../utils/command.js';
-import { getToken, getBaseUrl, isTokenValid, whoami } from '../utils/auth.js';
+import { getToken, getBaseUrl, isTokenValid, whoami, callApi } from '../utils/auth.js';
 import { selectPartner } from '../utils/partners.js';
 
 export default function(program) {
@@ -42,13 +42,15 @@ export default function(program) {
 
                 // 2. Request a new app in the api
                 spinner.text = 'Requesting new app from SitePack...';
-                const response = await axios.post(`${baseUrl}/api/console/apps/init`, {
-                    dirname: dirname,
-                    name: appName,
-                    partner: partnerUuid
-                }, {
+                const response = await callApi({
+                    method: 'post',
+                    url: `${baseUrl}/api/console/apps/init`,
+                    data: {
+                        dirname: dirname,
+                        name: appName,
+                        partner: partnerUuid
+                    },
                     headers: {
-                        'X-SitePack-Access-Token': token.access_token,
                         'X-SitePack-Partner': partnerUuid
                     }
                 });
@@ -64,7 +66,14 @@ export default function(program) {
                 spinner.text = 'Cloning app skeleton...';
                 await runCommand('git', ['clone', 'https://github.com/sitepack-io/sitepack-app-skeleton.git', targetDir]);
 
-                // 4. Modify the app.json file and set the uuid and app name
+                // 4. Remove .git directory to unlink from skeleton
+                try {
+                    await fs.remove(path.join(targetDir, '.git'));
+                } catch (e) {
+                    // Ignore if removal fails
+                }
+
+                // 5. Modify the app.json file and set the uuid and app name
                 const appJsonPath = path.join(targetDir, 'app.json');
                 if (await fs.pathExists(appJsonPath)) {
                     const appJson = await fs.readJson(appJsonPath);
@@ -88,19 +97,11 @@ export default function(program) {
                     await fs.writeJson(appJsonPath, appData, { spaces: 2 });
                 }
 
-                // Cleanup git history if it was cloned with history
-                try {
-                    await fs.remove(path.join(targetDir, '.git'));
-                    await runCommand('git', ['init'], { cwd: targetDir });
-                } catch (e) {
-                    // Ignore if git operations fail
-                }
-
                 spinner.succeed(chalk.green(`✅ App initialized successfully in ${dirname}!`));
                 console.log(chalk.cyan(`\nYour new app UUID is: ${uuid}`));
                 console.log(chalk.yellow(`\nNext steps:`));
                 console.log(chalk.white(`  cd ${dirname}`));
-                console.log(chalk.white(`  sitepack app:watch\n`));
+                console.log(chalk.white(`  sitepack app:publish\n`));
             } catch (err) {
                 spinner.fail(chalk.red('Failed to initialize app: ' + (err.response?.data?.message || err.message)));
             }
