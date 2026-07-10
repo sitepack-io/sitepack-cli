@@ -96,7 +96,7 @@ async function getWelcomeMessage() {
 program
     .name('sitepack')
     .description('SitePack Official CLI - Build your ecosystem\n\nDocumentation & Examples: https://sitepack.dev/')
-    .version('1.1.0');
+    .version('1.1.1');
 
 // We will add the help text dynamically before parsing
 const welcomeMessage = await getWelcomeMessage();
@@ -120,6 +120,7 @@ ${chalk.bold('partners')}
     ${chalk.cyan('partner:organisations')}        - List all organizations you have access to
     ${chalk.cyan('partner:change-organisation')} - Select a different organization to work with
     ${chalk.cyan('partner:create-organisation')} - Open the browser to create a new organization
+    ${chalk.cyan('partner:sites')}                - List the sites linked to the selected organization
 
 ${chalk.bold('account')}
     ${chalk.cyan('login')}       - Connect the CLI interface with your SitePack account

@@ -7,9 +7,10 @@ import chokidar from 'chokidar';
 import ignore from 'ignore';
 import { glob } from 'glob';
 import FormData from 'form-data';
-import { getToken, isTokenValid, getThemeCdnUrl, getSelectedPartner, callApi } from '../utils/auth.js';
+import { getToken, isTokenValid, getBaseUrl, getThemeCdnUrl, getSelectedPartner, callApi } from '../utils/auth.js';
 import { validateJsonFile } from '../utils/json.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
+import { getSites, selectSite } from '../utils/sites.js';
 
 export default function(program) {
     program
@@ -56,6 +57,30 @@ export default function(program) {
             if (!partnerUuid) {
                 console.log(chalk.red('Error: No partner organization selected. Use "sitepack partner:select" to select one.'));
                 return;
+            }
+
+            // 4. Ask which site to preview the custom theme on
+            const sites = await getSites(partnerUuid);
+            if (sites.length === 0) {
+                console.log(chalk.yellow('This organization has no sites yet — skipping preview site selection.'));
+            } else {
+                const siteUuid = await selectSite(sites);
+                const selectedSite = sites.find(s => s.uuid === siteUuid);
+
+                try {
+                    const baseUrl = await getBaseUrl();
+                    await callApi({
+                        method: 'post',
+                        url: `${baseUrl}/api/console/themes/watch-site`,
+                        data: { theme_uuid: uuid, site_uuid: siteUuid },
+                        headers: { 'X-SitePack-Partner': partnerUuid }
+                    });
+                    console.log(chalk.green(`Previewing on: ${selectedSite.name} (${selectedSite.domain})`));
+                } catch (err) {
+                    const serverData = err.response?.data;
+                    const serverMessage = serverData?.message || serverData?.error || (typeof serverData === 'string' ? serverData : '');
+                    console.log(chalk.red(`Failed to set preview site: ${serverMessage || err.message}`));
+                }
             }
 
             console.log(chalk.cyan(`Watching theme: ${themeConfig.name || uuid} (${uuid})`));
