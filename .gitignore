@@ -1,5 +1,7 @@
 .idea
 node_modules
+test-results
+coverage
 .DS_Store
 assets/.DS_Store
 my-theme/

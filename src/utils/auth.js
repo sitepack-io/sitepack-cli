@@ -4,8 +4,17 @@ import fs from 'fs-extra';
 import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
+import { describeApiError, readScopes } from './response.js';
 
-const CONFIG_PATH = path.join(os.homedir(), '.sitepackconfig');
+/**
+ * Resolved on use rather than at import time, so the CLI always follows the
+ * current home directory.
+ *
+ * @returns {string} the path of the global config file
+ */
+function getConfigPath() {
+    return path.join(os.homedir(), '.sitepackconfig');
+}
 
 async function getConfig() {
     let currentDir = process.cwd();
@@ -35,9 +44,9 @@ async function getConfig() {
     }
 
     // 2. Check ~/.sitepackconfig and merge it (global config)
-    if (await fs.pathExists(CONFIG_PATH)) {
+    if (await fs.pathExists(getConfigPath())) {
         try {
-            const globalConfig = await fs.readJson(CONFIG_PATH);
+            const globalConfig = await fs.readJson(getConfigPath());
             config = { ...globalConfig, ...config };
         } catch (err) {
             // Ignore broken global config
@@ -69,9 +78,9 @@ export async function getCdnUrl() {
 
 export async function saveToken(tokenData) {
     let config = {};
-    if (await fs.pathExists(CONFIG_PATH)) {
+    if (await fs.pathExists(getConfigPath())) {
         try {
-            config = await fs.readJson(CONFIG_PATH);
+            config = await fs.readJson(getConfigPath());
         } catch (err) {
             // Ignore broken config
         }
@@ -81,7 +90,7 @@ export async function saveToken(tokenData) {
     const newConfig = { ...config, ...tokenData };
     
     // Ensure the token data is saved securely (file permissions)
-    await fs.writeJson(CONFIG_PATH, newConfig, { mode: 0o600 });
+    await fs.writeJson(getConfigPath(), newConfig, { mode: 0o600 });
 }
 
 export async function getSelectedPartner() {
@@ -91,15 +100,15 @@ export async function getSelectedPartner() {
 
 export async function saveSelectedPartner(partnerUuid) {
     let config = {};
-    if (await fs.pathExists(CONFIG_PATH)) {
+    if (await fs.pathExists(getConfigPath())) {
         try {
-            config = await fs.readJson(CONFIG_PATH);
+            config = await fs.readJson(getConfigPath());
         } catch (err) {
             // Ignore broken config
         }
     }
     config.selected_partner_uuid = partnerUuid;
-    await fs.writeJson(CONFIG_PATH, config, { mode: 0o600 });
+    await fs.writeJson(getConfigPath(), config, { mode: 0o600 });
 }
 
 export async function getToken() {
@@ -177,11 +186,12 @@ export async function refreshToken() {
         });
 
         if (response.data.access_token) {
+            const refreshedScopes = readScopes(response.data);
             const tokenData = {
                 access_token: response.data.access_token,
                 refresh_token: response.data.refresh_token || token.refresh_token, // keep old one if new one not provided
                 client_id: token.client_id,
-                scopes: response.data.scopes || token.scopes || [],
+                scopes: refreshedScopes.length > 0 ? refreshedScopes : (token.scopes || []),
                 expires_at: response.data.expires_in ? Date.now() + (response.data.expires_in * 1000) : null
             };
             await saveToken(tokenData);
@@ -240,20 +250,20 @@ export async function logout() {
         }
     }
     
-    if (await fs.pathExists(CONFIG_PATH)) {
+    if (await fs.pathExists(getConfigPath())) {
         try {
-            const config = await fs.readJson(CONFIG_PATH);
+            const config = await fs.readJson(getConfigPath());
             const tokenKeys = ['access_token', 'refresh_token', 'expires_at', 'scopes', 'client_id'];
             tokenKeys.forEach(key => delete config[key]);
             
             if (Object.keys(config).length === 0) {
-                await fs.remove(CONFIG_PATH);
+                await fs.remove(getConfigPath());
             } else {
-                await fs.writeJson(CONFIG_PATH, config, { mode: 0o600 });
+                await fs.writeJson(getConfigPath(), config, { mode: 0o600 });
             }
         } catch (err) {
             // If it's broken, just remove it
-            await fs.remove(CONFIG_PATH);
+            await fs.remove(getConfigPath());
         }
     }
 }
@@ -301,7 +311,7 @@ export async function performLogin(apiUrl) {
                             access_token: tokenResponse.data.access_token,
                             refresh_token: tokenResponse.data.refresh_token || null,
                             client_id: finalClientId,
-                            scopes: tokenResponse.data.scopes || [],
+                            scopes: readScopes(tokenResponse.data),
                             expires_at: tokenResponse.data.expires_in ? Date.now() + (tokenResponse.data.expires_in * 1000) : null
                         };
                         await saveToken(tokenData);
@@ -325,12 +335,12 @@ export async function performLogin(apiUrl) {
                         }
                     } else {
                         clearInterval(interval);
-                        reject(new Error(`Authentication failed: ${error.message}`));
+                        reject(new Error(`Authentication failed: ${describeApiError(error)}`));
                     }
                 }
             }, (pollInterval || 5) * 1000);
         });
     } catch (error) {
-        throw new Error(`Failed to initiate login: ${error.response?.data?.message || error.message}`);
+        throw new Error(`Failed to initiate login: ${describeApiError(error)}`);
     }
 }

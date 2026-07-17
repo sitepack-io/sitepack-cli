@@ -10,6 +10,7 @@ import inquirer from 'inquirer';
 import { getToken, isTokenValid, getThemeCdnUrl, getSelectedPartner, callApi } from '../utils/auth.js';
 import { validateJsonFile } from '../utils/json.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
+import { describeApiError, readPublishedVersion } from '../utils/response.js';
 
 export default function(program) {
     program
@@ -98,6 +99,11 @@ export default function(program) {
 
             const allowedFolders = ['assets', 'config', 'layouts', 'snippets', 'templates', 'translations'];
 
+            // The server only accepts these at the theme root. Uploading anything
+            // else there (a README, or this CLI's own sitepack.config.json) is
+            // rejected, which used to abort the whole publish.
+            const allowedRootFiles = ['theme.json', 'themes.json'];
+
             const uploadFile = async (filePath) => {
                 const relativePath = path.relative(process.cwd(), filePath);
                 if (ig.ignores(relativePath)) return;
@@ -146,7 +152,7 @@ export default function(program) {
                 const filteredFiles = files.filter(file => {
                     if (ig.ignores(file)) return false;
                     const parts = file.split(path.sep);
-                    if (parts.length === 1) return true;
+                    if (parts.length === 1) return allowedRootFiles.includes(parts[0]);
                     return allowedFolders.includes(parts[0]);
                 });
 
@@ -169,9 +175,7 @@ export default function(program) {
                 }
                 spinner.succeed(chalk.green('Full file sync completed.'));
             } catch (err) {
-                const serverData = err.response?.data;
-                const serverMessage = serverData?.message || serverData?.error || err.message;
-                spinner.fail(chalk.red('Sync failed: ' + serverMessage));
+                spinner.fail(chalk.red('Sync failed: ' + describeApiError(err)));
                 return;
             }
 
@@ -194,16 +198,14 @@ export default function(program) {
                     console.log(chalk.gray(JSON.stringify(publishResponse.data, null, 2)));
                 }
 
-                const version = publishResponse.data?.version;
+                const version = readPublishedVersion(publishResponse.data);
                 if (version) {
                     publishSpinner.succeed(chalk.green(`✅ Theme published successfully! New version: ${version}`));
                 } else {
                     publishSpinner.succeed(chalk.green('✅ Theme published successfully!'));
                 }
             } catch (err) {
-                const serverData = err.response?.data;
-                const serverMessage = serverData?.message || serverData?.error || err.message;
-                publishSpinner.fail(chalk.red('Publishing failed: ' + serverMessage));
+                publishSpinner.fail(chalk.red('Publishing failed: ' + describeApiError(err)));
                 if (isDebug && err.response) {
                     console.log(chalk.gray('[DEBUG] Publish error response:'));
                     console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));

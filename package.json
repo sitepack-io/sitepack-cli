@@ -6,7 +6,10 @@
     "sitepack": "./bin/sitepack.js"
   },
   "scripts": {
-    "preinstall": "node -e \"if(process.env.npm_execpath && !process.env.npm_execpath.includes('yarn') && !process.env.npm_execpath.includes('npm')) { console.error('Please use npm or yarn to install dependencies'); process.exit(1); }\""
+    "preinstall": "node -e \"if(process.env.npm_execpath && !process.env.npm_execpath.includes('yarn') && !process.env.npm_execpath.includes('npm')) { console.error('Please use npm or yarn to install dependencies'); process.exit(1); }\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "adm-zip": "^0.5.17",
@@ -21,6 +24,9 @@
     "inquirer": "^9.2.15",
     "open": "^11.0.0",
     "ora": "^8.2.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
   },
   "packageManager": "yarn@1.22.22"
 }

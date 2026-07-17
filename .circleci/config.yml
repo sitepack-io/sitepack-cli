@@ -1,0 +1,52 @@
+version: 2.1
+
+executors:
+  node:
+    docker:
+      - image: cimg/node:22.11
+
+commands:
+  install-dependencies:
+    description: "Restore the node_modules cache and install dependencies"
+    steps:
+      - checkout
+      - run: node -v
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "yarn.lock" }}
+            - v1-dependencies-
+      - run:
+          name: "Install Dependencies"
+          command: yarn install --frozen-lockfile
+      - save_cache:
+          key: v1-dependencies-{{ checksum "yarn.lock" }}
+          paths:
+            - ./node_modules
+
+jobs:
+  tests:
+    executor: node
+    steps:
+      - install-dependencies
+      - run:
+          name: "Run Vitest tests"
+          command: yarn test --reporter=default --reporter=junit --outputFile=./test-results/vitest/results.xml
+      - store_test_results:
+          path: ./test-results
+
+  smoke:
+    executor: node
+    steps:
+      - install-dependencies
+      - run:
+          name: "The CLI starts and lists its commands"
+          command: node bin/sitepack.js --help
+      - run:
+          name: "The CLI reports its version"
+          command: node bin/sitepack.js --version
+
+workflows:
+  build_and_test:
+    jobs:
+      - tests
+      - smoke
