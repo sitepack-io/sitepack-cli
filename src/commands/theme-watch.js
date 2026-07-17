@@ -11,6 +11,7 @@ import { getToken, isTokenValid, getBaseUrl, getThemeCdnUrl, getSelectedPartner,
 import { validateJsonFile } from '../utils/json.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
 import { getSites, selectSite } from '../utils/sites.js';
+import { describeApiError } from '../utils/response.js';
 
 export default function(program) {
     program
@@ -77,9 +78,7 @@ export default function(program) {
                     });
                     console.log(chalk.green(`Previewing on: ${selectedSite.name} (${selectedSite.domain})`));
                 } catch (err) {
-                    const serverData = err.response?.data;
-                    const serverMessage = serverData?.message || serverData?.error || (typeof serverData === 'string' ? serverData : '');
-                    console.log(chalk.red(`Failed to set preview site: ${serverMessage || err.message}`));
+                    console.log(chalk.red(`Failed to set preview site: ${describeApiError(err)}`));
                 }
             }
 
@@ -116,9 +115,34 @@ export default function(program) {
                 'twig': 'text/plain'
             };
 
+            const allowedFolders = ['assets', 'config', 'layouts', 'snippets', 'templates', 'translations'];
+
+            // The server only accepts these at the theme root; anything else there
+            // (a README, or this CLI's own sitepack.config.json) is rejected.
+            const allowedRootFiles = ['theme.json', 'themes.json'];
+
+            /**
+             * Whether a path belongs to the theme structure the server accepts.
+             * Syncing anything else earns a 422 and aborts the sync.
+             *
+             * @param {string} relativePath - path relative to the theme root
+             * @returns {boolean}
+             */
+            const isPartOfTheme = (relativePath) => {
+                const parts = relativePath.split(path.sep);
+
+                if (parts.length === 1) {
+                    return allowedRootFiles.includes(parts[0]);
+                }
+
+                return allowedFolders.includes(parts[0]);
+            };
+
             const uploadFile = async (filePath) => {
                 const relativePath = path.relative(process.cwd(), filePath);
                 if (ig.ignores(relativePath)) return;
+
+                if (!isPartOfTheme(relativePath)) return;
 
                 const ext = path.extname(filePath).slice(1).toLowerCase();
                 if (!allowedTypes[ext]) {
@@ -166,15 +190,16 @@ export default function(program) {
                         console.log(chalk.gray(`[DEBUG] Error response for ${relativePath}:`));
                         console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));
                     }
-                    const serverData = err.response?.data;
-                    const serverMessage = serverData?.message || serverData?.error || (typeof serverData === 'string' ? serverData : '');
-                    console.log(chalk.red(`✗ Failed to sync ${relativePath}: ${serverMessage || err.message}`));
+                    console.log(chalk.red(`✗ Failed to sync ${relativePath}: ${describeApiError(err)}`));
                 }
             };
 
             const deleteFile = async (filePath) => {
                 const relativePath = path.relative(process.cwd(), filePath);
                 if (ig.ignores(relativePath)) return;
+
+                // Only files that were synced can be deleted server-side.
+                if (!isPartOfTheme(relativePath)) return;
 
                 const url = `${themeCdnUrl}/${uuid}/${relativePath}`.replace(/\\/g, '/');
 
@@ -198,13 +223,9 @@ export default function(program) {
                         console.log(chalk.gray(`[DEBUG] Error response for deleting ${relativePath}:`));
                         console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));
                     }
-                    const serverData = err.response?.data;
-                    const serverMessage = serverData?.message || serverData?.error || (typeof serverData === 'string' ? serverData : '');
-                    console.log(chalk.red(`✗ Failed to delete ${relativePath}: ${serverMessage || err.message}`));
+                    console.log(chalk.red(`✗ Failed to delete ${relativePath}: ${describeApiError(err)}`));
                 }
             };
-
-            const allowedFolders = ['assets', 'config', 'layouts', 'snippets', 'templates', 'translations'];
 
             // Initial sync
             const spinner = ora('Performing initial sync...').start();
@@ -234,11 +255,9 @@ export default function(program) {
 
                 const filteredFiles = files.filter(file => {
                     if (ig.ignores(file)) return false;
-                    if (file === 'theme.json') return true;
                     const parts = file.split(path.sep);
-                    if (parts.length === 1) return true;
-                    const rootFolder = parts[0];
-                    return allowedFolders.includes(rootFolder);
+                    if (parts.length === 1) return allowedRootFiles.includes(parts[0]);
+                    return allowedFolders.includes(parts[0]);
                 });
                 
                 for (const file of filteredFiles) {
@@ -267,13 +286,17 @@ export default function(program) {
                     if (relativePath === '.sitepackignore') return true;
                     if (ig.ignores(relativePath)) return true;
 
-                    if (relativePath === 'theme.json') return false;
-
-                    const rootFolder = relativePath.split(path.sep)[0];
-                    if (allowedFolders.includes(rootFolder)) return false;
-
                     const parts = relativePath.split(path.sep);
-                    return parts.length > 1;
+
+                    // Root level entries are kept: chokidar does not always pass
+                    // stats, so a theme directory must never be ignored here or
+                    // its contents are never watched. uploadFile does the real
+                    // filtering.
+                    if (parts.length === 1) {
+                        return false;
+                    }
+
+                    return !allowedFolders.includes(parts[0]);
                 },
                 persistent: true,
                 ignoreInitial: true

@@ -10,6 +10,7 @@ import inquirer from 'inquirer';
 import { getToken, isTokenValid, getAppCdnUrl, getSelectedPartner, callApi } from '../utils/auth.js';
 import { validateJsonFile } from '../utils/json.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
+import { describeApiError, readPublishedVersion } from '../utils/response.js';
 
 export default function(program) {
     program
@@ -96,6 +97,11 @@ export default function(program) {
                 'html': 'text/html'
             };
 
+            // The server only accepts these directories, and only app.json at the
+            // app root; anything else is rejected and aborts the whole publish.
+            const allowedFolders = ['templates', 'assets'];
+            const allowedRootFiles = ['app.json'];
+
             const uploadFile = async (filePath) => {
                 const relativePath = path.relative(process.cwd(), filePath);
                 if (ig.ignores(relativePath)) return;
@@ -141,8 +147,15 @@ export default function(program) {
                     ignore: ['node_modules/**', '.git/**'] 
                 });
 
+                const filteredFiles = files.filter(file => {
+                    if (ig.ignores(file)) return false;
+                    const parts = file.split(path.sep);
+                    if (parts.length === 1) return allowedRootFiles.includes(parts[0]);
+                    return allowedFolders.includes(parts[0]);
+                });
+
                 // Validate JSON files before starting
-                for (const file of files) {
+                for (const file of filteredFiles) {
                     if (path.extname(file).toLowerCase() === '.json') {
                         const filePath = path.resolve(process.cwd(), file);
                         const validation = await validateJsonFile(filePath);
@@ -152,17 +165,15 @@ export default function(program) {
                         }
                     }
                 }
-                
-                for (const file of files) {
+
+                for (const file of filteredFiles) {
                     spinner.text = `Syncing ${file}...`;
                     const filePath = path.resolve(process.cwd(), file);
                     await uploadFile(filePath);
                 }
                 spinner.succeed(chalk.green('Full file sync completed.'));
             } catch (err) {
-                const serverData = err.response?.data;
-                const serverMessage = serverData?.message || serverData?.error || err.message;
-                spinner.fail(chalk.red('Sync failed: ' + serverMessage));
+                spinner.fail(chalk.red('Sync failed: ' + describeApiError(err)));
                 return;
             }
 
@@ -185,16 +196,14 @@ export default function(program) {
                     console.log(chalk.gray(JSON.stringify(publishResponse.data, null, 2)));
                 }
 
-                const version = publishResponse.data?.version;
+                const version = readPublishedVersion(publishResponse.data);
                 if (version) {
                     publishSpinner.succeed(chalk.green(`✅ App published successfully! New version: ${version}`));
                 } else {
                     publishSpinner.succeed(chalk.green('✅ App published successfully!'));
                 }
             } catch (err) {
-                const serverData = err.response?.data;
-                const serverMessage = serverData?.message || serverData?.error || err.message;
-                publishSpinner.fail(chalk.red('Publishing failed: ' + serverMessage));
+                publishSpinner.fail(chalk.red('Publishing failed: ' + describeApiError(err)));
                 if (isDebug && err.response) {
                     console.log(chalk.gray('[DEBUG] Publish error response:'));
                     console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));

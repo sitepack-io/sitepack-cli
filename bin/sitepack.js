@@ -2,6 +2,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { createRequire } from 'module';
 import { isTokenValid, whoami, getSelectedPartner } from '../src/utils/auth.js';
 import { checkForUpdates } from '../src/utils/update.js';
 import loginCommand from '../src/commands/login.js';
@@ -15,6 +16,9 @@ import themeWatchCommand from '../src/commands/theme-watch.js';
 import themePublishCommand from '../src/commands/theme-publish.js';
 import partnerCommands from '../src/commands/partner.js';
 import { ensurePartnerSelected, getPartners } from '../src/utils/partners.js';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json');
 
 const program = new Command();
 
@@ -96,7 +100,7 @@ async function getWelcomeMessage() {
 program
     .name('sitepack')
     .description('SitePack Official CLI - Build your ecosystem\n\nDocumentation & Examples: https://sitepack.dev/')
-    .version('1.1.1');
+    .version(pkg.version);
 
 // We will add the help text dynamically before parsing
 const welcomeMessage = await getWelcomeMessage();
