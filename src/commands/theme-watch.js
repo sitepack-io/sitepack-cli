@@ -12,6 +12,8 @@ import { validateJsonFile } from '../utils/json.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
 import { getSites, selectSite } from '../utils/sites.js';
 import { describeApiError } from '../utils/response.js';
+import { withRetry } from '../utils/retry.js';
+import { notifyFailure } from '../utils/notify.js';
 
 export default function(program) {
     program
@@ -164,17 +166,29 @@ export default function(program) {
                 const url = `${themeCdnUrl}/${uuid}/${relativePath}`.replace(/\\/g, '/');
 
                 try {
-                    const form = new FormData();
-                    form.append('file', fs.createReadStream(filePath));
+                    // The request body is single-use (a read stream), so build a
+                    // fresh form on every attempt. One retry rides out a transient
+                    // failure such as a timed-out request (HTTP 408).
+                    const response = await withRetry(() => {
+                        const form = new FormData();
+                        form.append('file', fs.createReadStream(filePath));
 
-                    const response = await callApi({
-                        method: 'post',
-                        url: url,
-                        data: form,
-                        headers: {
-                            ...form.getHeaders(),
-                            'X-Theme-Uuid': uuid,
-                            'X-SitePack-Partner': partnerUuid
+                        return callApi({
+                            method: 'post',
+                            url: url,
+                            data: form,
+                            headers: {
+                                ...form.getHeaders(),
+                                'X-Theme-Uuid': uuid,
+                                'X-SitePack-Partner': partnerUuid
+                            }
+                        });
+                    }, {
+                        retries: 1,
+                        onRetry: (err) => {
+                            if (isDebug) {
+                                console.log(chalk.gray(`[DEBUG] Retrying ${relativePath} after: ${describeApiError(err)}`));
+                            }
                         }
                     });
 
@@ -191,6 +205,7 @@ export default function(program) {
                         console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));
                     }
                     console.log(chalk.red(`✗ Failed to sync ${relativePath}: ${describeApiError(err)}`));
+                    notifyFailure('SitePack sync failed', `Failed to sync ${relativePath}`);
                 }
             };
 
@@ -204,12 +219,19 @@ export default function(program) {
                 const url = `${themeCdnUrl}/${uuid}/${relativePath}`.replace(/\\/g, '/');
 
                 try {
-                    await callApi({
+                    await withRetry(() => callApi({
                         method: 'delete',
                         url: url,
                         headers: {
                             'X-Theme-Uuid': uuid,
                             'X-SitePack-Partner': partnerUuid
+                        }
+                    }), {
+                        retries: 1,
+                        onRetry: (err) => {
+                            if (isDebug) {
+                                console.log(chalk.gray(`[DEBUG] Retrying delete of ${relativePath} after: ${describeApiError(err)}`));
+                            }
                         }
                     });
 
@@ -224,6 +246,7 @@ export default function(program) {
                         console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));
                     }
                     console.log(chalk.red(`✗ Failed to delete ${relativePath}: ${describeApiError(err)}`));
+                    notifyFailure('SitePack sync failed', `Failed to delete ${relativePath}`);
                 }
             };
 

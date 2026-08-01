@@ -11,6 +11,8 @@ import { getToken, isTokenValid, getThemeCdnUrl, getSelectedPartner, callApi } f
 import { validateJsonFile } from '../utils/json.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
 import { describeApiError, readPublishedVersion } from '../utils/response.js';
+import { withRetry } from '../utils/retry.js';
+import { notifyFailure } from '../utils/notify.js';
 
 export default function(program) {
     program
@@ -113,20 +115,30 @@ export default function(program) {
 
                 const url = `${themeCdnUrl}/${uuid}/${relativePath}`.replace(/\\/g, '/');
 
-                const form = new FormData();
-                form.append('file', fs.createReadStream(filePath));
+                try {
+                    // Build a fresh form per attempt — the read stream is single-use.
+                    // One retry rides out a transient failure (e.g. HTTP 408).
+                    await withRetry(() => {
+                        const form = new FormData();
+                        form.append('file', fs.createReadStream(filePath));
 
-                await callApi({
-                    method: 'post',
-                    url: url,
-                    data: form,
-                    headers: {
-                        ...form.getHeaders(),
-                        'X-Theme-Uuid': uuid,
-                        'X-Partner-Uuid': partnerUuid,
-                        'X-SitePack-Partner': partnerUuid
-                    }
-                });
+                        return callApi({
+                            method: 'post',
+                            url: url,
+                            data: form,
+                            headers: {
+                                ...form.getHeaders(),
+                                'X-Theme-Uuid': uuid,
+                                'X-Partner-Uuid': partnerUuid,
+                                'X-SitePack-Partner': partnerUuid
+                            }
+                        });
+                    }, { retries: 1 });
+                } catch (err) {
+                    // Bump the terminal / raise a popup, then abort the publish.
+                    notifyFailure('SitePack publish failed', `Failed to sync ${relativePath}`);
+                    throw err;
+                }
             };
 
             try {
@@ -183,7 +195,7 @@ export default function(program) {
             const publishSpinner = ora('Publishing new version...').start();
             try {
                 const publishUrl = `${themeCdnUrl}/${uuid}/publish`.replace(/([^:]\/)\/+/g, "$1");
-                const publishResponse = await callApi({
+                const publishResponse = await withRetry(() => callApi({
                     method: 'post',
                     url: publishUrl,
                     headers: {
@@ -191,7 +203,7 @@ export default function(program) {
                         'X-Partner-Uuid': partnerUuid,
                         'X-SitePack-Partner': partnerUuid
                     }
-                });
+                }), { retries: 1 });
 
                 if (isDebug) {
                     console.log(chalk.gray('[DEBUG] Publish response:'));
@@ -206,6 +218,7 @@ export default function(program) {
                 }
             } catch (err) {
                 publishSpinner.fail(chalk.red('Publishing failed: ' + describeApiError(err)));
+                notifyFailure('SitePack publish failed', `Publishing failed: ${describeApiError(err)}`);
                 if (isDebug && err.response) {
                     console.log(chalk.gray('[DEBUG] Publish error response:'));
                     console.log(chalk.gray(JSON.stringify(err.response.data, null, 2)));
