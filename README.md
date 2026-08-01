@@ -139,6 +139,37 @@ sitepack app:checkout
 
 <p>&nbsp;</p>
 
+## Building pages with AI
+
+`sitepack theme:watch` opens a development session on the site you picked. `sitepack mcp`
+serves that session to an AI editor over MCP, so an agent can fill in the pages of the
+design you are building — read the theme's templates and the element types that exist,
+create pages, put them in a menu, write translations, and check that what it built actually
+renders.
+
+Everything it writes is **staging** content: served by `staging-<your-domain>` and by
+nothing else. The session holds `content:staging` rather than `content:write`, so it cannot
+publish a page and cannot touch one that is already live, even on a site with real
+visitors. What goes live stays a decision a person makes in the admin.
+
+Start the watch in one terminal:
+
+```bash
+sitepack theme:watch
+```
+
+Then point your editor at the server. For Claude Code:
+
+```bash
+claude mcp add sitepack -- sitepack mcp
+```
+
+Any MCP client works — the command to run is `sitepack mcp`, with the theme directory as
+the working directory. Started elsewhere, it falls back to the most recent watch session;
+`--theme <uuid>` picks one when several are running.
+
+The session ends with the watch, and its token expires after eight hours.
+
 ## Commands
 
 | Command | Description |
@@ -152,6 +183,7 @@ sitepack app:checkout
 | `sitepack theme:init` | Start a new SitePack theme project |
 | `sitepack theme:watch` | Watch for changes in the theme directory and sync to SitePack |
 | `sitepack theme:publish` | Publish the theme to SitePack (full sync and release) |
+| `sitepack mcp` | Run the MCP server for the watched theme, so an AI editor can build staging pages |
 | `sitepack partner:organisations` | List all organizations you have access to |
 | `sitepack partner:change-organisation` | Select a different organization to work with |
 | `sitepack partner:create-organisation` | Open the browser to create a new organization |

@@ -14,6 +14,7 @@ import appCheckoutCommand from '../src/commands/app-checkout.js';
 import themeInitCommand from '../src/commands/theme-init.js';
 import themeWatchCommand from '../src/commands/theme-watch.js';
 import themePublishCommand from '../src/commands/theme-publish.js';
+import mcpCommand from '../src/commands/mcp.js';
 import partnerCommands from '../src/commands/partner.js';
 import { ensurePartnerSelected, getPartners } from '../src/utils/partners.js';
 
@@ -102,9 +103,12 @@ program
     .description('SitePack Official CLI - Build your ecosystem\n\nDocumentation & Examples: https://sitepack.dev/')
     .version(pkg.version);
 
-// We will add the help text dynamically before parsing
-const welcomeMessage = await getWelcomeMessage();
-program.addHelpText('before', welcomeMessage);
+// We will add the help text dynamically before parsing. Skipped for "mcp": the banner is
+// only ever shown with help, and building it costs a round trip to the API that an editor
+// starting the MCP server would wait through on every launch.
+if (process.argv[2] !== 'mcp') {
+    program.addHelpText('before', await getWelcomeMessage());
+}
 
 program.helpInformation = function() {
     return `
@@ -119,6 +123,9 @@ ${chalk.bold('themes')}
     ${chalk.cyan('theme:init')}    - Start a new SitePack theme project
     ${chalk.cyan('theme:watch')}   - Watch for changes in the theme directory and sync to SitePack
     ${chalk.cyan('theme:publish')} - Publish the theme to SitePack (full sync and release)
+
+${chalk.bold('ai')}
+    ${chalk.cyan('mcp')}           - Run the MCP server for the watched theme, for AI editors
 
 ${chalk.bold('partners')}
     ${chalk.cyan('partner:organisations')}        - List all organizations you have access to
@@ -149,14 +156,24 @@ appCheckoutCommand(program);
 themeInitCommand(program);
 themeWatchCommand(program);
 themePublishCommand(program);
+mcpCommand(program);
 partnerCommands(program);
 
-// Check for updates (max once every 10 minutes)
-await checkForUpdates();
+const currentCommand = process.argv[2];
+
+// "mcp" speaks the MCP protocol over stdout, so nothing else may be written there: an
+// update notice or a login warning on that stream is a protocol error to the client, not
+// a message to a person. It also authenticates with its own session token rather than the
+// CLI login, so the warning would be wrong as well as fatal.
+const isMachineReadableCommand = currentCommand === 'mcp';
+
+if (!isMachineReadableCommand) {
+    // Check for updates (max once every 10 minutes)
+    await checkForUpdates();
+}
 
 // Check for authentication and show warning if not logged in
-const skipValidationCommands = [undefined, 'login', 'help', '--help', '-h', '--version', '-V', 'whoami', 'partner:organisations', 'partner:change-organisation'];
-const currentCommand = process.argv[2];
+const skipValidationCommands = [undefined, 'login', 'help', '--help', '-h', '--version', '-V', 'whoami', 'partner:organisations', 'partner:change-organisation', 'mcp'];
 
 if (!skipValidationCommands.includes(currentCommand)) {
     const isValid = await isTokenValid();
