@@ -18,11 +18,13 @@ vi.mock('ora', () => {
     };
     return { default: vi.fn(() => spinner), __spinner: spinner };
 });
+vi.mock('../src/utils/notify.js', () => ({ notifyFailure: vi.fn() }));
 
 const axios = (await import('axios')).default;
 const inquirer = (await import('inquirer')).default;
 const oraModule = await import('ora');
 const spinner = oraModule.__spinner;
+const { notifyFailure } = await import('../src/utils/notify.js');
 
 let tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sitepack-home-'));
 
@@ -59,6 +61,7 @@ describe('sitepack theme:publish', () => {
         inquirer.prompt.mockReset();
         spinner.succeed.mockClear();
         spinner.fail.mockClear();
+        notifyFailure.mockClear();
 
         // A logged-in developer, in a theme directory, who confirms the publish.
         await saveToken({ access_token: 'token-abc', expires_at: Date.now() + 60_000 });
@@ -179,6 +182,99 @@ describe('sitepack theme:publish', () => {
 
         expect(requests().some((c) => c.url.endsWith('/publish'))).toBe(false);
         expect(spinner.fail).toHaveBeenCalledWith(expect.stringContaining('File type not allowed'));
+    });
+
+    it('retries a failed upload once before continuing to publish', async () => {
+        const templateUrl = `https://sync.sitepack.dev/themes/${THEME_UUID}/templates/index.twig`;
+        let templateAttempts = 0;
+
+        axios.mockImplementation(async (config) => {
+            if (config.url === templateUrl) {
+                templateAttempts += 1;
+                if (templateAttempts === 1) {
+                    return Promise.reject({ response: { status: 408 } });
+                }
+            }
+            return { data: { status: 'ok', version: 5 } };
+        });
+
+        await runPublish();
+
+        expect(templateAttempts).toBe(2);
+        expect(requests().some((c) => c.url.endsWith('/publish'))).toBe(true);
+        expect(spinner.succeed).toHaveBeenCalledWith(expect.stringContaining('New version: 5'));
+        // A recovered upload is not worth interrupting the developer over.
+        expect(notifyFailure).not.toHaveBeenCalled();
+    });
+
+    it('retries the publish call once before giving up', async () => {
+        let publishAttempts = 0;
+
+        axios.mockImplementation(async (config) => {
+            if (config.url.endsWith('/publish')) {
+                publishAttempts += 1;
+                if (publishAttempts === 1) {
+                    return Promise.reject({ response: { status: 408 } });
+                }
+                return { data: { status: 'ok', version: 7 } };
+            }
+            return { data: { status: 'ok' } };
+        });
+
+        await runPublish();
+
+        expect(publishAttempts).toBe(2);
+        expect(spinner.succeed).toHaveBeenCalledWith(expect.stringContaining('New version: 7'));
+        expect(spinner.fail).not.toHaveBeenCalled();
+    });
+
+    /**
+     * A publish is a deliberate action the developer waits on, so a failure
+     * that survives the retry has to be unmistakable.
+     */
+    it('reports and alerts when the publish keeps failing', async () => {
+        let publishAttempts = 0;
+
+        axios.mockImplementation(async (config) => {
+            if (config.url.endsWith('/publish')) {
+                publishAttempts += 1;
+                return Promise.reject({ response: { status: 500 } });
+            }
+            return { data: { status: 'ok' } };
+        });
+
+        await runPublish();
+
+        // The one publish plus one retry.
+        expect(publishAttempts).toBe(2);
+        expect(spinner.fail).toHaveBeenCalledWith(expect.stringContaining('HTTP 500'));
+        expect(notifyFailure).toHaveBeenCalledWith(
+            'SitePack publish failed',
+            expect.stringContaining('Publishing failed'),
+        );
+    });
+
+    it('aborts the publish when an upload keeps failing after the retry', async () => {
+        const templateUrl = `https://sync.sitepack.dev/themes/${THEME_UUID}/templates/index.twig`;
+        let templateAttempts = 0;
+
+        axios.mockImplementation(async (config) => {
+            if (config.url === templateUrl) {
+                templateAttempts += 1;
+                return Promise.reject({ response: { status: 408 } });
+            }
+            return { data: { status: 'ok' } };
+        });
+
+        await runPublish();
+
+        expect(templateAttempts).toBe(2);
+        expect(requests().some((c) => c.url.endsWith('/publish'))).toBe(false);
+        expect(spinner.fail).toHaveBeenCalledWith(expect.stringContaining('HTTP 408'));
+        expect(notifyFailure).toHaveBeenCalledWith(
+            'SitePack publish failed',
+            'Failed to sync templates/index.twig',
+        );
     });
 
     it('aborts before uploading when a json file is invalid', async () => {
