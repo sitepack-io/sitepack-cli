@@ -619,6 +619,42 @@ export function buildTools({ api, session }) {
         },
 
         {
+            name: 'get_theme_settings',
+            config: {
+                title: 'Get theme settings',
+                description:
+                    'The design settings of the theme being watched: the colours, fonts, pixel '
+                    + 'sizes and options it declares (each with its key, type, label and default), '
+                    + 'the values the staging preview renders right now, and the staging overrides '
+                    + 'this session has set. Read this before changing anything so you use keys and '
+                    + 'value formats that exist - a colour is a hex string, a pixels value carries '
+                    + 'its unit ("8px"), a font is a font key like "Open_Sans", an options value is '
+                    + 'one of its listed options.',
+                inputSchema: {},
+            },
+            handler: () => api.get('/theme/settings'),
+        },
+
+        {
+            name: 'update_theme_settings',
+            config: {
+                title: 'Change theme settings',
+                description:
+                    'Change theme design settings - colours, fonts, and the like. `settings` is a '
+                    + 'map of setting key to value; only the keys you send change. Every change is '
+                    + 'staging: it shows on the staging site and never on the live site, so a '
+                    + 'person decides when the new look goes live. Use get_theme_settings first to '
+                    + 'see which keys exist and in what format.',
+                inputSchema: {
+                    settings: z
+                        .record(z.string(), z.union([z.string(), z.number(), z.array(z.string())]))
+                        .describe('Setting values keyed by setting key, e.g. { "main-color": "#0b1220", "heading-font": "Roboto" }'),
+                },
+            },
+            handler: ({ settings }) => api.patch('/theme/settings', { settings }),
+        },
+
+        {
             name: 'check_page_render',
             config: {
                 title: 'Check a page renders',
