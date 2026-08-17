@@ -65,7 +65,7 @@ describe('sitepack mcp', () => {
         theme_uuid: '019f0000-0000-7000-8000-000000000001',
         theme_name: 'Website',
         theme_dir: null,
-        scopes: ['content:staging', 'navigation:write'],
+        scopes: ['content:write', 'navigation:write', 'categories:write', 'products:write', 'media:read'],
         site: {
             uuid: '019f0000-0000-7000-8000-000000000002',
             name: 'SitePack',
@@ -108,8 +108,10 @@ describe('sitepack mcp', () => {
         const names = tools.map(tool => tool.name);
 
         expect(names).toContain('site_context');
-        expect(names).toContain('list_element_types');
-        expect(names).toContain('create_staging_page');
+        expect(names).toContain('create_page');
+        expect(names).toContain('add_navigation_item');
+        expect(names).toContain('create_category');
+        expect(names).toContain('create_product');
         expect(names).toContain('check_page_render');
 
         for (const tool of tools) {
@@ -117,19 +119,12 @@ describe('sitepack mcp', () => {
         }
     });
 
-    it('answers site_context from the site and the theme templates at once', async () => {
+    it('answers site_context from the site, with the staging URL and scopes of the session', async () => {
         answers = {
             'GET /api/public/v1/site': {
                 body: {
                     status: 'success',
                     site: { uuid: 'site-uuid', name: 'SitePack', staging: { available: true, url: 'https://staging-x' } },
-                },
-            },
-            'GET /api/public/v1/theme/templates': {
-                body: {
-                    status: 'success',
-                    watching: true,
-                    templates: [{ key: 'pricing', name: 'Pricing', staging: true, fields: [] }],
                 },
             },
         };
@@ -138,15 +133,15 @@ describe('sitepack mcp', () => {
         const result = resultOf(await client.callTool({ name: 'site_context', arguments: {} }));
 
         expect(result.site.staging.available).toBe(true);
-        expect(result.watching).toBe(true);
-        expect(result.templates[0].key).toBe('pricing');
+        expect(result.staging_url).toBe('https://staging-en-sitepack-bv.sitepack.app');
+        expect(result.scopes).toContain('content:write');
         expect(result.theme.name).toBe('Website');
 
         // The session token, on every call, as a bearer token.
         expect(calls.every(call => call.auth === 'Bearer test-session-token')).toBe(true);
     });
 
-    it('creates pages as staging and hands back where to look at them', async () => {
+    it('creates pages as staging by default and hands back where to look at them', async () => {
         answers = {
             'POST /api/public/v1/content': {
                 status: 201,
@@ -159,15 +154,37 @@ describe('sitepack mcp', () => {
 
         const client = await connect();
         const result = resultOf(await client.callTool({
-            name: 'create_staging_page',
+            name: 'create_page',
             arguments: { title: 'Prijzen', slug: 'prijzen', template_key: 'pricing' },
         }));
 
-        // Never the caller's choice: the tool writes staging or it writes nothing.
+        // Staging is the default, so building on a live site never publishes by accident.
         expect(calls[0].body.status).toBe('staging');
         expect(calls[0].body.template_key).toBe('pricing');
         expect(result.staging_url).toBe('https://staging-en-sitepack-bv.sitepack.app/prijzen');
         expect(result.next).toContain('check_page_render');
+    });
+
+    it('publishes a page when the status is asked for explicitly', async () => {
+        answers = {
+            'POST /api/public/v1/content': {
+                status: 201,
+                body: {
+                    status: 'success',
+                    content: { uuid: 'page-uuid', title: 'Live', slug: 'live', status: 'published' },
+                },
+            },
+        };
+
+        const client = await connect();
+        const result = resultOf(await client.callTool({
+            name: 'create_page',
+            arguments: { title: 'Live', status: 'published' },
+        }));
+
+        // The choice to go live is the caller's, passed per call.
+        expect(calls[0].body.status).toBe('published');
+        expect(result.page.status).toBe('published');
     });
 
     it('turns an API refusal into something the agent can act on', async () => {
@@ -185,17 +202,17 @@ describe('sitepack mcp', () => {
         };
 
         const client = await connect();
-        const response = await client.callTool({ name: 'create_staging_page', arguments: { title: 'Prijzen' } });
+        const response = await client.callTool({ name: 'create_page', arguments: { title: 'Prijzen' } });
 
         expect(response.isError).toBe(true);
         expect(response.content[0].text).toContain('theme:watch');
     });
 
-    it('adds menu entries as staging, so the live menu never gains a broken link', async () => {
+    it('adds a menu entry pointing at the page it was given', async () => {
         answers = {
             'POST /api/public/v1/navigations/main/items': {
                 status: 201,
-                body: { status: 'success', item: { uuid: 'item-uuid', label: 'Prijzen', staging: true } },
+                body: { status: 'success', item: { uuid: 'item-uuid', label: 'Prijzen', content_uuid: 'page-uuid' } },
             },
         };
 
@@ -206,10 +223,47 @@ describe('sitepack mcp', () => {
             arguments: { section: 'main', label: 'Prijzen', url: '/prijzen', content_uuid: 'page-uuid' },
         }));
 
-        // Not the caller's choice, for the same reason pages are not: a menu is shared with
-        // production, so an entry for a page that only exists on staging belongs there too.
-        expect(calls[0].body.staging).toBe(true);
+        // The item carries the page it points at; a menu entry to a staging page is hidden
+        // on the live site by the server until that page is published.
+        expect(calls[0].body.content_uuid).toBe('page-uuid');
         expect(added.item.uuid).toBe('item-uuid');
+    });
+
+    it('creates a product category by default, since that is what the store needs', async () => {
+        answers = {
+            'POST /api/public/v1/categories': {
+                status: 201,
+                body: { status: 'success', category: { uuid: 'cat-uuid', name: 'Wijnen', type: 'product' } },
+            },
+        };
+
+        const client = await connect();
+        const result = resultOf(await client.callTool({
+            name: 'create_category',
+            arguments: { name: 'Wijnen' },
+        }));
+
+        // The store is what this is for, so a category is a product category unless asked otherwise.
+        expect(calls[0].body.type).toBe('product');
+        expect(result.category.uuid).toBe('cat-uuid');
+    });
+
+    it('creates a product with its price in cents', async () => {
+        answers = {
+            'POST /api/public/v1/products': {
+                status: 201,
+                body: { status: 'success', product: { uuid: 'prod-uuid', name: 'Rioja', price_cents: 1995 } },
+            },
+        };
+
+        const client = await connect();
+        const result = resultOf(await client.callTool({
+            name: 'create_product',
+            arguments: { name: 'Rioja', price_cents: 1995 },
+        }));
+
+        expect(calls[0].body.price_cents).toBe(1995);
+        expect(result.product.uuid).toBe('prod-uuid');
     });
 
     it('reports a page that renders as broken when the response carries a twig error', async () => {

@@ -18,16 +18,17 @@ export async function startMcpServer(session, { version }) {
         { name: 'sitepack', version },
         {
             instructions:
-                'Build and translate pages on a SitePack site that a developer is currently '
-                + 'watching a theme onto.\n\n'
-                + 'Start with `site_context`: it says which site this is, whether staging is live, '
-                + 'and which templates the theme declares. Everything written here is *staging* - '
-                + 'served by staging-<domain> and invisible to visitors - and this session cannot '
-                + 'publish, so a person still decides what goes live.\n\n'
-                + 'Before writing an element tree, read `list_element_types`: settings keys that do '
-                + 'not exist are accepted and then ignored at render time, so a wrong guess produces '
-                + 'a page that is quietly wrong. After building a page, call `check_page_render` - '
-                + 'a 201 from the API is not the same as a page that renders.',
+                'Build pages, menus and the online store on a SitePack site that a developer is '
+                + 'currently watching a theme onto.\n\n'
+                + 'Start with `site_context`: it says which site this is, the staging URL and the '
+                + 'scopes this session holds. Pages default to *staging* - served by '
+                + 'staging-<domain> and invisible to visitors - which is the safe way to build on '
+                + 'a live site. You can publish a page (status "published"), but that puts it in '
+                + 'front of real visitors, so ask the person first rather than deciding to go live '
+                + 'yourself. Categories and products have no staging: those are written to the '
+                + 'live store straight away.\n\n'
+                + 'After building a page, call `check_page_render` - a 201 from the API is not the '
+                + 'same as a page that renders.',
         }
     );
 
