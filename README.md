@@ -141,16 +141,19 @@ sitepack app:checkout
 
 ## Building pages with AI
 
-`sitepack theme:watch` opens a development session on the site you picked. `sitepack mcp`
-serves that session to an AI editor over MCP, so an agent can fill in the pages of the
-design you are building — read the theme's templates and the element types that exist,
-create pages, put them in a menu, write translations, and check that what it built actually
-renders.
+`sitepack theme:watch` opens a development session on the site you picked, and asks
+SitePack for a token scoped to that one site. `sitepack mcp` serves that session to an AI
+editor over MCP, so an agent can fill in the design you are building — create pages, put
+them in a menu, and manage the online store's categories and products — and check that
+what it built actually renders.
 
-Everything it writes is **staging** content: served by `staging-<your-domain>` and by
-nothing else. The session holds `content:staging` rather than `content:write`, so it cannot
-publish a page and cannot touch one that is already live, even on a site with real
-visitors. What goes live stays a decision a person makes in the admin.
+Pages default to **staging**: served by `staging-<your-domain>` and by nothing else, which
+is the safe way to build on a live site. The agent can publish a page when you ask it to
+(it is a choice made per page, not something the session forbids), so going live stays a
+decision you make rather than one that happens by accident. A menu entry pointing at a
+staging page is hidden on the live site until that page is published. The store's
+categories and products have no staging, so those are written to the live shop straight
+away.
 
 Start the watch in one terminal:
 

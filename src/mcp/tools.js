@@ -70,24 +70,22 @@ export function buildTools({ api, session }) {
             config: {
                 title: 'Site context',
                 description:
-                    'Where this development session points and what it may do: the site, whether '
-                    + 'staging content can be written right now, the staging URL, the page '
-                    + 'templates the theme declares, and the theme.json in the working copy. '
-                    + 'Call this before building anything - `staging.available: false` means every '
-                    + 'staging write will be refused until `sitepack theme:watch` is running.',
+                    'Where this development session points and what it may do: the site, the '
+                    + 'staging URL, the scopes this session holds, and the theme.json in the '
+                    + 'working copy. Call this before building anything. Pages default to staging '
+                    + '(invisible to visitors, served by staging-<domain>); publishing is possible '
+                    + 'but should be a person\'s decision, asked for per page.',
                 inputSchema: {},
             },
             handler: async () => {
-                const [site, templates, local] = await Promise.all([
+                const [site, local] = await Promise.all([
                     api.get('/site'),
-                    api.get('/theme/templates'),
                     localTheme(),
                 ]);
 
                 return {
                     site: site.site,
-                    watching: templates.watching,
-                    templates: templates.templates,
+                    staging_url: (session.site && session.site.staging && session.site.staging.url) || null,
                     scopes: session.scopes,
                     session_expires: session.expires,
                     theme: {
@@ -99,38 +97,6 @@ export function buildTools({ api, session }) {
                         local_config: local,
                     },
                 };
-            },
-        },
-
-        {
-            name: 'list_element_types',
-            config: {
-                title: 'List element types',
-                description:
-                    'The blocks a page can be built from, each with the settings it understands '
-                    + 'and their defaults. Settings that are not in here are stored and then '
-                    + 'ignored at render time, so read this before writing an element tree rather '
-                    + 'than guessing key names. `available: false` means the block needs a module '
-                    + 'this site does not have and would render as nothing.',
-                inputSchema: {
-                    surface: z
-                        .enum(['content', 'designer'])
-                        .optional()
-                        .describe('content = a page, blog or category; designer = the homepage'),
-                    group: z
-                        .string()
-                        .optional()
-                        .describe('Only one group, e.g. "basic", "sections", "layout", "media"'),
-                },
-            },
-            handler: async ({ surface, group }) => {
-                const response = await api.get('/elements/types', surface ? { surface } : undefined);
-
-                const types = group
-                    ? response.types.filter(type => type.group === group)
-                    : response.types;
-
-                return { surfaces: response.surfaces, count: types.length, types };
             },
         },
 
@@ -181,17 +147,22 @@ export function buildTools({ api, session }) {
         },
 
         {
-            name: 'create_staging_page',
+            name: 'create_page',
             config: {
-                title: 'Create a staging page',
+                title: 'Create a page',
                 description:
-                    'Create a page that only the staging site serves. It is invisible to visitors '
-                    + 'and stays that way: this session cannot publish it, which is what makes it '
-                    + 'safe to build on a live site. Needs a theme in watch mode. Bind it to a '
-                    + 'theme template with `template_key` and fill that template through '
-                    + '`template_fields`, or build it from blocks with `elements`.',
+                    'Create a page on the site. It defaults to `staging` - served only by '
+                    + 'staging-<domain> and invisible to visitors, which is the safe way to build '
+                    + 'on a live site. Pass `status: "published"` to put it live straight away, or '
+                    + '`"draft"` to keep it out of both. Bind it to a theme template with '
+                    + '`template_key` and fill that template through `template_fields`, or build '
+                    + 'it from blocks with `elements`.',
                 inputSchema: {
                     title: z.string().describe('The page title'),
+                    status: z
+                        .enum(['staging', 'published', 'draft'])
+                        .optional()
+                        .describe('Defaults to "staging". "published" makes it live; ask a person before doing that.'),
                     slug: z.string().optional().describe('URL segment; derived from the title when left out'),
                     parent_uuid: z.string().optional().describe('Nest the page under another page'),
                     template_key: z.string().optional().describe('A template from site_context'),
@@ -213,8 +184,8 @@ export function buildTools({ api, session }) {
                         .optional(),
                 },
             },
-            handler: async (input) => {
-                const response = await api.post('/content', { ...input, status: 'staging' });
+            handler: async ({ status, ...input }) => {
+                const response = await api.post('/content', { ...input, status: status || 'staging' });
 
                 return {
                     page: response.content,
@@ -229,12 +200,14 @@ export function buildTools({ api, session }) {
             config: {
                 title: 'Update a page',
                 description:
-                    'Change a staging page: its title, slug, parent, template binding, template '
-                    + 'fields or SEO. Only the fields you send are written. A page that is not '
-                    + 'staging is refused - those belong to the merchant.',
+                    'Change a page: its title, slug, parent, template binding, template fields, '
+                    + 'SEO or status. Only the fields you send are written. Pass '
+                    + '`status: "published"` to take a staging page live, or `"staging"` to pull a '
+                    + 'live page back to staging - a person should decide when a page goes live.',
                 inputSchema: {
                     uuid: z.string(),
                     title: z.string().optional(),
+                    status: z.enum(['staging', 'published', 'draft']).optional(),
                     slug: z.string().optional(),
                     parent_uuid: z.string().nullable().optional(),
                     template_key: z.string().optional(),
@@ -301,10 +274,8 @@ export function buildTools({ api, session }) {
         {
             name: 'delete_page',
             config: {
-                title: 'Delete a staging page',
-                description:
-                    'Remove a staging page this session built. Pages that are not staging are '
-                    + 'refused.',
+                title: 'Delete a page',
+                description: 'Remove a page and its revisions from the site.',
                 inputSchema: { uuid: z.string() },
             },
             handler: async ({ uuid }) => {
@@ -320,8 +291,8 @@ export function buildTools({ api, session }) {
                 title: 'List navigation',
                 description:
                     'The menus of this site and their items. Leave `section` out for the list of '
-                    + 'menus. Each item says whether it is `staging` — items this session added, '
-                    + 'which only the staging site shows.',
+                    + 'menus; pass one (e.g. "main") for its items, each with its parent and the '
+                    + 'page or category it points at.',
                 inputSchema: {
                     section: z.string().optional().describe('e.g. "main" or "footer"'),
                 },
@@ -340,10 +311,10 @@ export function buildTools({ api, session }) {
             config: {
                 title: 'Add a navigation item',
                 description:
-                    'Add an entry to a menu. The entry is staging: a menu is shared with the live '
-                    + 'site, so an item this session adds is served by staging-<domain> and is '
-                    + 'invisible to visitors, exactly like the page it points at. Publishing the '
-                    + 'page and promoting its menu entry is a person\'s decision in the admin.',
+                    'Add an entry to a menu, optionally nested under another with `parent_uuid`. '
+                    + 'Point it at a page with `content_uuid`: an item that leads to a staging page '
+                    + 'is hidden on the live site until that page is published, so a menu entry for '
+                    + 'a page you are still building never reaches visitors early.',
                 inputSchema: {
                     section: z.string().describe('The menu, e.g. "main"'),
                     label: z.string(),
@@ -355,12 +326,9 @@ export function buildTools({ api, session }) {
                 },
             },
             handler: async ({ section, ...item }) => {
-                const response = await api.post(`/navigations/${section}/items`, { ...item, staging: true });
+                const response = await api.post(`/navigations/${section}/items`, item);
 
-                return {
-                    item: response.item,
-                    note: 'Visible on the staging site only, like the pages this session builds.',
-                };
+                return { item: response.item };
             },
         },
 
@@ -400,84 +368,6 @@ export function buildTools({ api, session }) {
         },
 
         {
-            name: 'reorder_navigation',
-            config: {
-                title: 'Reorder a navigation',
-                description:
-                    'Set the order of a whole menu at once: the array of item uuids is the new '
-                    + 'order. Nothing is written unless every uuid resolves.',
-                inputSchema: {
-                    section: z.string(),
-                    items: z.array(z.string()).describe('Item uuids, in the order they should appear'),
-                },
-            },
-            handler: ({ section, items }) => api.put(`/navigations/${section}/items`, { items }),
-        },
-
-        {
-            name: 'list_locales',
-            config: {
-                title: 'List locales',
-                description:
-                    'The locales this site is translated into, and the URL prefix each one is '
-                    + 'served under. A locale that is not here cannot be written to - it has not '
-                    + 'been purchased for this site.',
-                inputSchema: {},
-            },
-            handler: () => api.get('/translations/locales'),
-        },
-
-        {
-            name: 'get_translation',
-            config: {
-                title: 'Get a translation',
-                description:
-                    'The translatable strings of one page in one locale: what the master says, '
-                    + 'what the translation says, and which entries are missing or have gone stale '
-                    + 'since the master changed.',
-                inputSchema: {
-                    uuid: z.string().describe('The page uuid'),
-                    locale: z.string().describe('e.g. "de"'),
-                    type: z.enum(['page', 'blog', 'product', 'category']).optional(),
-                },
-            },
-            handler: ({ uuid, locale, type }) =>
-                api.get(`/translations/${type || 'page'}/${uuid}/${locale}`),
-        },
-
-        {
-            name: 'save_translation',
-            config: {
-                title: 'Save a translation',
-                description:
-                    'Write translated strings for one page in one locale. `values` is keyed by the '
-                    + 'translation paths get_translation returns (e.g. "title", '
-                    + '"elements#0.value") - a key that is not one of those is not a string the '
-                    + 'page has.',
-                inputSchema: {
-                    uuid: z.string(),
-                    locale: z.string(),
-                    type: z.enum(['page', 'blog', 'product', 'category']).optional(),
-                    values: z.record(z.string(), z.string()),
-                },
-            },
-            handler: ({ uuid, locale, type, values }) =>
-                api.put(`/translations/${type || 'page'}/${uuid}/${locale}`, { values }),
-        },
-
-        {
-            name: 'translation_coverage',
-            config: {
-                title: 'Translation coverage',
-                description:
-                    'What is translated and what is not, per locale, across the whole site - the '
-                    + 'quickest way to find what a run still has to do.',
-                inputSchema: {},
-            },
-            handler: () => api.get('/translations/coverage'),
-        },
-
-        {
             name: 'list_media',
             config: {
                 title: 'List media',
@@ -493,6 +383,238 @@ export function buildTools({ api, session }) {
                 const response = await api.get('/media', { q: search, limit: limit ?? 50 });
 
                 return { total: response.pagination && response.pagination.totalRecords, media: response.items };
+            },
+        },
+
+        {
+            name: 'list_categories',
+            config: {
+                title: 'List categories',
+                description:
+                    'The categories of this site. Product categories organise the online store; '
+                    + 'filter with `type: "product"` for those, or `type: "blog"` for blog '
+                    + 'categories.',
+                inputSchema: {
+                    type: z.enum(['product', 'blog']).optional(),
+                    search: z.string().optional().describe('Free text over the category name'),
+                    limit: z.number().int().min(1).max(100).optional(),
+                },
+            },
+            handler: async ({ type, search, limit }) => {
+                const response = await api.get('/categories', { type, q: search, limit: limit ?? 100 });
+
+                return {
+                    total: response.pagination && response.pagination.totalRecords,
+                    categories: response.items,
+                };
+            },
+        },
+
+        {
+            name: 'get_category',
+            config: {
+                title: 'Get a category',
+                description: 'One category with its name, slug, type and SEO metadata.',
+                inputSchema: { uuid: z.string() },
+            },
+            handler: async ({ uuid }) => {
+                const response = await api.get(`/categories/${uuid}`);
+
+                return { category: response.category };
+            },
+        },
+
+        {
+            name: 'create_category',
+            config: {
+                title: 'Create a category',
+                description:
+                    'Create an online-store category. Defaults to a product category; pass '
+                    + '`type: "blog"` for a blog category. Nest it under another with '
+                    + '`parent_uuid`. Unlike pages, categories are live straight away - there is '
+                    + 'no staging for the store, so only create ones that are meant to be seen.',
+                inputSchema: {
+                    name: z.string().describe('The category name'),
+                    slug: z.string().optional().describe('URL segment; derived from the name when left out'),
+                    type: z.enum(['product', 'blog']).optional().describe('Defaults to "product"'),
+                    parent_uuid: z.string().optional().describe('Nest under another category'),
+                    seo: z
+                        .object({
+                            custom_title: z.string().optional(),
+                            meta_description: z.string().optional(),
+                            focus_keyword: z.string().optional(),
+                        })
+                        .optional(),
+                },
+            },
+            handler: async ({ type, ...input }) => {
+                const response = await api.post('/categories', { ...input, type: type || 'product' });
+
+                return { category: response.category };
+            },
+        },
+
+        {
+            name: 'update_category',
+            config: {
+                title: 'Update a category',
+                description:
+                    'Change a category: its name, slug, parent or SEO. Only the fields you send '
+                    + 'are written.',
+                inputSchema: {
+                    uuid: z.string(),
+                    name: z.string().optional(),
+                    slug: z.string().optional(),
+                    parent_uuid: z.string().nullable().optional(),
+                    seo: z
+                        .object({
+                            custom_title: z.string().optional(),
+                            meta_description: z.string().optional(),
+                            focus_keyword: z.string().optional(),
+                        })
+                        .optional(),
+                },
+            },
+            handler: async ({ uuid, ...changes }) => {
+                const response = await api.patch(`/categories/${uuid}`, changes);
+
+                return { category: response.category };
+            },
+        },
+
+        {
+            name: 'delete_category',
+            config: {
+                title: 'Delete a category',
+                description: 'Remove a category from the site.',
+                inputSchema: { uuid: z.string() },
+            },
+            handler: async ({ uuid }) => {
+                await api.delete(`/categories/${uuid}`);
+
+                return { deleted: uuid };
+            },
+        },
+
+        {
+            name: 'list_products',
+            config: {
+                title: 'List products',
+                description:
+                    'The products of this site\'s online store. Filter by free text, sku or '
+                    + 'barcode.',
+                inputSchema: {
+                    search: z.string().optional().describe('Free text over the product name'),
+                    sku: z.string().optional(),
+                    barcode: z.string().optional(),
+                    limit: z.number().int().min(1).max(100).optional(),
+                },
+            },
+            handler: async ({ search, sku, barcode, limit }) => {
+                const response = await api.get('/products', { q: search, sku, barcode, limit: limit ?? 100 });
+
+                return {
+                    total: response.pagination && response.pagination.totalRecords,
+                    products: response.items,
+                };
+            },
+        },
+
+        {
+            name: 'get_product',
+            config: {
+                title: 'Get a product',
+                description: 'One product with its price, stock, identifiers and SEO metadata.',
+                inputSchema: { uuid: z.string() },
+            },
+            handler: async ({ uuid }) => {
+                const response = await api.get(`/products/${uuid}`);
+
+                return { product: response.product };
+            },
+        },
+
+        {
+            name: 'create_product',
+            config: {
+                title: 'Create a product',
+                description:
+                    'Create a product in the online store. Prices are in cents (EUR), so €19.95 '
+                    + 'is `1995`. Like categories, products are live straight away - there is no '
+                    + 'staging for the store.',
+                inputSchema: {
+                    name: z.string().describe('The product name'),
+                    price_cents: z.number().int().min(0).describe('Price in cents, e.g. 1995 for €19.95'),
+                    slug: z.string().optional(),
+                    stock: z.number().int().optional().describe('Defaults to 0'),
+                    sku: z.string().optional(),
+                    barcode: z.string().optional(),
+                    brand: z.string().optional(),
+                    model: z.string().optional(),
+                    description: z.string().optional(),
+                    price_promo_cents: z.number().int().min(0).optional().describe('Sale price in cents'),
+                    archived: z.boolean().optional(),
+                    seo: z
+                        .object({
+                            meta_description: z.string().optional(),
+                            focus_keyword: z.string().optional(),
+                        })
+                        .optional(),
+                },
+            },
+            handler: async (input) => {
+                const response = await api.post('/products', input);
+
+                return { product: response.product };
+            },
+        },
+
+        {
+            name: 'update_product',
+            config: {
+                title: 'Update a product',
+                description:
+                    'Change a product: name, price, stock, identifiers, description or SEO. Only '
+                    + 'the fields you send are written. Prices are in cents.',
+                inputSchema: {
+                    uuid: z.string(),
+                    name: z.string().optional(),
+                    price_cents: z.number().int().min(0).optional(),
+                    slug: z.string().optional(),
+                    stock: z.number().int().optional(),
+                    sku: z.string().optional(),
+                    barcode: z.string().optional(),
+                    brand: z.string().optional(),
+                    model: z.string().optional(),
+                    description: z.string().optional(),
+                    price_promo_cents: z.number().int().min(0).optional(),
+                    archived: z.boolean().optional(),
+                    seo: z
+                        .object({
+                            meta_description: z.string().optional(),
+                            focus_keyword: z.string().optional(),
+                        })
+                        .optional(),
+                },
+            },
+            handler: async ({ uuid, ...changes }) => {
+                const response = await api.patch(`/products/${uuid}`, changes);
+
+                return { product: response.product };
+            },
+        },
+
+        {
+            name: 'delete_product',
+            config: {
+                title: 'Delete a product',
+                description: 'Remove a product from the store.',
+                inputSchema: { uuid: z.string() },
+            },
+            handler: async ({ uuid }) => {
+                await api.delete(`/products/${uuid}`);
+
+                return { deleted: uuid };
             },
         },
 
