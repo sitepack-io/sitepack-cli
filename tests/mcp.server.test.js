@@ -65,7 +65,7 @@ describe('sitepack mcp', () => {
         theme_uuid: '019f0000-0000-7000-8000-000000000001',
         theme_name: 'Website',
         theme_dir: null,
-        scopes: ['content:write', 'navigation:write', 'categories:write', 'products:write', 'media:read'],
+        scopes: ['content:write', 'navigation:write', 'categories:write', 'products:write', 'themes:write', 'media:read'],
         site: {
             uuid: '019f0000-0000-7000-8000-000000000002',
             name: 'SitePack',
@@ -112,6 +112,8 @@ describe('sitepack mcp', () => {
         expect(names).toContain('add_navigation_item');
         expect(names).toContain('create_category');
         expect(names).toContain('create_product');
+        expect(names).toContain('get_theme_settings');
+        expect(names).toContain('update_theme_settings');
         expect(names).toContain('check_page_render');
 
         for (const tool of tools) {
@@ -264,6 +266,46 @@ describe('sitepack mcp', () => {
 
         expect(calls[0].body.price_cents).toBe(1995);
         expect(result.product.uuid).toBe('prod-uuid');
+    });
+
+    it('reads the theme design settings', async () => {
+        answers = {
+            'GET /api/public/v1/theme/settings': {
+                body: {
+                    status: 'success',
+                    settings: [{ key: 'main-color', type: 'colour', label: 'Main colour', default: '#ca992f' }],
+                    values: { 'main-color': '#ca992f' },
+                    staging_overrides: {},
+                },
+            },
+        };
+
+        const client = await connect();
+        const result = resultOf(await client.callTool({ name: 'get_theme_settings', arguments: {} }));
+
+        expect(result.settings[0].key).toBe('main-color');
+        expect(result.values['main-color']).toBe('#ca992f');
+    });
+
+    it('changes theme settings on staging, sending only the keys given', async () => {
+        answers = {
+            'PATCH /api/public/v1/theme/settings': {
+                body: {
+                    status: 'success',
+                    staging_overrides: { 'main-color': '#0b1220' },
+                    values: { 'main-color': '#0b1220' },
+                },
+            },
+        };
+
+        const client = await connect();
+        const result = resultOf(await client.callTool({
+            name: 'update_theme_settings',
+            arguments: { settings: { 'main-color': '#0b1220' } },
+        }));
+
+        expect(calls[0].body.settings['main-color']).toBe('#0b1220');
+        expect(result.staging_overrides['main-color']).toBe('#0b1220');
     });
 
     it('reports a page that renders as broken when the response carries a twig error', async () => {

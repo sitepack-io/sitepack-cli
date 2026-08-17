@@ -27,6 +27,10 @@ export async function startMcpServer(session, { version }) {
                 + 'front of real visitors, so ask the person first rather than deciding to go live '
                 + 'yourself. Categories and products have no staging: those are written to the '
                 + 'live store straight away.\n\n'
+                + 'You can also restyle the theme with `get_theme_settings` and '
+                + '`update_theme_settings` (colours, fonts). Those changes are staging too: they '
+                + 'show on the staging site and never on the live site, so a person decides when a '
+                + 'new look goes live.\n\n'
                 + 'After building a page, call `check_page_render` - a 201 from the API is not the '
                 + 'same as a page that renders.',
         }
