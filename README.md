@@ -9,7 +9,7 @@ With the SitePack command line interface (SitePack CLI), you can:
 - bootstrap, develop, and manage SitePack apps
 - build and manage your ecosystem
 
-Learn more in the docs: [sitepack.dev](https://sitepack.dev)
+Learn more in the [development docs](https://sitepack.dev) and [help docs on help.sitepack.eu](https://help.sitepack.eu).
 
 <p>&nbsp;</p>
 
@@ -69,7 +69,7 @@ sitepack logout
 
 ## Organizations
 
-Most resources in SitePack (like apps and themes) are owned by an organization (partner). You can register your company as a partner for free in our [partner dashboard](https://sitepack.eu/partners).
+Most resources in SitePack (like apps and themes) are owned by an organization (partner). You can register your company as a partner for free in our [partner dashboard](https://admin.sitepack.eu/partners).
 
 To list all organizations you have access to, run:
 
