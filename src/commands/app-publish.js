@@ -99,7 +99,7 @@ export default function(program) {
 
             // The server only accepts these directories, and only app.json at the
             // app root; anything else is rejected and aborts the whole publish.
-            const allowedFolders = ['templates', 'assets'];
+            const allowedFolders = ['templates', 'assets', 'translations'];
             const allowedRootFiles = ['app.json'];
 
             const uploadFile = async (filePath) => {
