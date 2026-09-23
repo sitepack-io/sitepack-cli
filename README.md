@@ -139,6 +139,40 @@ sitepack app:checkout
 
 <p>&nbsp;</p>
 
+## Building pages with AI
+
+`sitepack theme:watch` opens a development session on the site you picked, and asks
+SitePack for a token scoped to that one site. `sitepack mcp` serves that session to an AI
+editor over MCP, so an agent can fill in the design you are building — create pages, put
+them in a menu, and manage the online store's categories and products — and check that
+what it built actually renders.
+
+Pages default to **staging**: served by `staging-<your-domain>` and by nothing else, which
+is the safe way to build on a live site. The agent can publish a page when you ask it to
+(it is a choice made per page, not something the session forbids), so going live stays a
+decision you make rather than one that happens by accident. A menu entry pointing at a
+staging page is hidden on the live site until that page is published. The store's
+categories and products have no staging, so those are written to the live shop straight
+away.
+
+Start the watch in one terminal:
+
+```bash
+sitepack theme:watch
+```
+
+Then point your editor at the server. For Claude Code:
+
+```bash
+claude mcp add sitepack -- sitepack mcp
+```
+
+Any MCP client works — the command to run is `sitepack mcp`, with the theme directory as
+the working directory. Started elsewhere, it falls back to the most recent watch session;
+`--theme <uuid>` picks one when several are running.
+
+The session ends with the watch, and its token expires after eight hours.
+
 ## Commands
 
 | Command | Description |
@@ -152,6 +186,7 @@ sitepack app:checkout
 | `sitepack theme:init` | Start a new SitePack theme project |
 | `sitepack theme:watch` | Watch for changes in the theme directory and sync to SitePack |
 | `sitepack theme:publish` | Publish the theme to SitePack (full sync and release) |
+| `sitepack mcp` | Run the MCP server for the watched theme, so an AI editor can build staging pages |
 | `sitepack partner:organisations` | List all organizations you have access to |
 | `sitepack partner:change-organisation` | Select a different organization to work with |
 | `sitepack partner:create-organisation` | Open the browser to create a new organization |

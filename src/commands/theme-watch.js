@@ -14,6 +14,7 @@ import { getSites, selectSite } from '../utils/sites.js';
 import { describeApiError } from '../utils/response.js';
 import { withRetry } from '../utils/retry.js';
 import { notifyFailure } from '../utils/notify.js';
+import { saveSession, clearSession } from '../mcp/session.js';
 
 export default function(program) {
     program
@@ -22,6 +23,8 @@ export default function(program) {
         .option('--debug', 'Output full server response')
         .action(async (options) => {
             const isDebug = !!options.debug;
+            // Set once a session is stored, so stopping the watch can take it away again.
+            let watchedThemeUuid = null;
             // 1. Check if user is logged in
             const isValid = await isTokenValid();
             if (!isValid) {
@@ -72,13 +75,42 @@ export default function(program) {
 
                 try {
                     const baseUrl = await getBaseUrl();
-                    await callApi({
+                    const watchResponse = await callApi({
                         method: 'post',
                         url: `${baseUrl}/api/console/themes/watch-site`,
                         data: { theme_uuid: uuid, site_uuid: siteUuid },
                         headers: { 'X-SitePack-Partner': partnerUuid }
                     });
                     console.log(chalk.green(`Previewing on: ${selectedSite.name} (${selectedSite.domain})`));
+
+                    // The server hands back an app API session for this site, scoped to
+                    // staging content. Storing it is what lets "sitepack mcp" work: an
+                    // editor starts that in another process and has no other way to learn
+                    // which site is being worked on, let alone to authenticate for it.
+                    const session = watchResponse.data?.session;
+
+                    if (session?.access_token) {
+                        await saveSession(uuid, {
+                            ...session,
+                            base_url: baseUrl,
+                            theme_uuid: uuid,
+                            theme_name: themeConfig.name || null,
+                            theme_dir: process.cwd(),
+                            site: {
+                                uuid: selectedSite.uuid,
+                                name: selectedSite.name,
+                                domain: selectedSite.domain,
+                                staging: {
+                                    host: `staging-${selectedSite.domain}`,
+                                    url: `https://staging-${selectedSite.domain}`,
+                                },
+                            },
+                        });
+
+                        watchedThemeUuid = uuid;
+
+                        console.log(chalk.gray('AI session ready — run "sitepack mcp" to let an editor build staging pages on this site.'));
+                    }
                 } catch (err) {
                     console.log(chalk.red(`Failed to set preview site: ${describeApiError(err)}`));
                 }
@@ -356,9 +388,16 @@ export default function(program) {
             });
 
             // Keep alive
-            process.on('SIGINT', () => {
+            process.on('SIGINT', async () => {
                 watcher.close();
                 console.log(chalk.yellow('\nStopping watch...'));
+
+                // The token stays valid server-side until it expires, but nothing on this
+                // machine should keep offering it once the watch it belongs to is over.
+                if (watchedThemeUuid) {
+                    await clearSession(watchedThemeUuid);
+                }
+
                 process.exit();
             });
         });
