@@ -11,6 +11,7 @@ import whoamiCommand from '../src/commands/whoami.js';
 import appInitCommand from '../src/commands/app-init.js';
 import appPublishCommand from '../src/commands/app-publish.js';
 import appCheckoutCommand from '../src/commands/app-checkout.js';
+import appLinkCommand from '../src/commands/app-link.js';
 import themeInitCommand from '../src/commands/theme-init.js';
 import themeWatchCommand from '../src/commands/theme-watch.js';
 import themePublishCommand from '../src/commands/theme-publish.js';
@@ -114,6 +115,7 @@ ${chalk.bold('apps')}
     ${chalk.cyan('app:init')}      - Start a new SitePack app project
     ${chalk.cyan('app:publish')}   - Publish the app to SitePack (full sync and release)
     ${chalk.cyan('app:checkout')}  - Pull an app from SitePack to edit files locally
+    ${chalk.cyan('app:link')}      - Link an existing app directory to SitePack (registers a new uuid)
 
 ${chalk.bold('themes')}
     ${chalk.cyan('theme:init')}    - Start a new SitePack theme project
@@ -146,6 +148,7 @@ whoamiCommand(program);
 appInitCommand(program);
 appPublishCommand(program);
 appCheckoutCommand(program);
+appLinkCommand(program);
 themeInitCommand(program);
 themeWatchCommand(program);
 themePublishCommand(program);
