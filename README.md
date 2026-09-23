@@ -121,6 +121,16 @@ sitepack app:init
 
 This will create a new app structure and a `package.json` file.
 
+### Link an existing app directory
+
+Already have the source of an app (an `app.json` with its templates and assets), but no app for it in the partner dashboard yet? Link the directory instead of bootstrapping a new app:
+
+```bash
+sitepack app:link path/to/my-app
+```
+
+When the uuid in `app.json` is not an app of your selected organization, you choose between registering a new app (SitePack issues a new uuid) or linking it to one of your existing apps. The uuid is written back to `app.json`, so `sitepack app:publish` publishes to that app. Add `--new` to always register a new app.
+
 ### Publish your app
 
 To publish your app to SitePack, run:
@@ -149,6 +159,7 @@ sitepack app:checkout
 | `sitepack app:init` | Start a new SitePack app project |
 | `sitepack app:publish` | Publish the app to SitePack (full sync and release) |
 | `sitepack app:checkout` | Pull an app from SitePack to edit files locally |
+| `sitepack app:link [directory]` | Link an existing app directory to SitePack (registers a new uuid when needed) |
 | `sitepack theme:init` | Start a new SitePack theme project |
 | `sitepack theme:watch` | Watch for changes in the theme directory and sync to SitePack |
 | `sitepack theme:publish` | Publish the theme to SitePack (full sync and release) |
