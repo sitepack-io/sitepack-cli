@@ -3,7 +3,8 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { createRequire } from 'module';
-import { isTokenValid, whoami, getSelectedPartner } from '../src/utils/auth.js';
+import { isTokenValid, whoami, getSelectedPartner, isRejectedToken } from '../src/utils/auth.js';
+import { describeApiError } from '../src/utils/response.js';
 import { checkForUpdates } from '../src/utils/update.js';
 import loginCommand from '../src/commands/login.js';
 import logoutCommand from '../src/commands/logout.js';
@@ -171,11 +172,28 @@ if (!skipValidationCommands.includes(currentCommand)) {
             try {
                 await ensurePartnerSelected();
             } catch (err) {
-                console.error(chalk.red(`\nError: ${err.message}`));
-                process.exit(1);
+                reportFailure(err);
             }
         }
     }
 }
 
-program.parse(process.argv);
+try {
+    await program.parseAsync(process.argv);
+} catch (err) {
+    reportFailure(err);
+}
+
+/**
+ * Prints a failed command as one readable line instead of an axios dump.
+ *
+ * @param {any} err
+ */
+function reportFailure(err) {
+    if (isRejectedToken(err)) {
+        console.error(chalk.red('\nYour session has expired. Run "sitepack login" to log in again.'));
+    } else {
+        console.error(chalk.red(`\nError: ${err?.response ? describeApiError(err) : err?.message}`));
+    }
+    process.exit(1);
+}

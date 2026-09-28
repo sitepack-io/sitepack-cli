@@ -111,19 +111,22 @@ export default function(program) {
 
                 const url = `${appCdnUrl}/${uuid}/${relativePath}`.replace(/\\/g, '/');
 
-                const form = new FormData();
-                form.append('file', fs.createReadStream(filePath));
+                // A factory, so a retry after a token refresh gets a fresh read stream.
+                await callApi(() => {
+                    const form = new FormData();
+                    form.append('file', fs.createReadStream(filePath));
 
-                await callApi({
-                    method: 'post',
-                    url: url,
-                    data: form,
-                    headers: {
-                        ...form.getHeaders(),
-                        'X-App-Uuid': uuid,
-                        'X-Partner-Uuid': partnerUuid,
-                        'X-SitePack-Partner': partnerUuid
-                    }
+                    return {
+                        method: 'post',
+                        url: url,
+                        data: form,
+                        headers: {
+                            ...form.getHeaders(),
+                            'X-App-Uuid': uuid,
+                            'X-Partner-Uuid': partnerUuid,
+                            'X-SitePack-Partner': partnerUuid
+                        }
+                    };
                 });
             };
 

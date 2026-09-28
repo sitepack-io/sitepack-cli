@@ -120,56 +120,173 @@ export async function getToken() {
 }
 
 /**
- * Perform an API call with automatic token refresh on 401.
- * @param {import('axios').AxiosRequestConfig} axiosConfig
+ * Whether the server turned the request down because of the access token.
+ *
+ * Core answers an unknown or expired token on the console endpoints with a
+ * 400 ("Access token not found" / "Access token has expired") rather than a
+ * 401, so only looking at the status code never triggered a refresh.
+ *
+ * @param {any} error - the rejected axios error
+ * @returns {boolean}
+ */
+export function isRejectedToken(error) {
+    const response = error?.response;
+    if (!response) {
+        return false;
+    }
+
+    if (response.status === 401) {
+        return true;
+    }
+
+    let data = response.data;
+    if (Buffer.isBuffer(data) || data instanceof ArrayBuffer) {
+        // A download (responseType arraybuffer) hands the JSON error over as bytes.
+        try {
+            data = JSON.parse(Buffer.from(data).toString('utf8'));
+        } catch {
+            data = null;
+        }
+    }
+
+    const message = data?.message;
+
+    return response.status === 400
+        && typeof message === 'string'
+        && /access token (not found|has expired)/i.test(message);
+}
+
+/**
+ * Refresh this long before the local expiry, so a request is not sent with a
+ * token that runs out while it is under way.
+ */
+const EXPIRY_MARGIN_MS = 60 * 1000;
+
+/** How long to wait for another CLI process that is busy refreshing. */
+const REFRESH_LOCK_TIMEOUT_MS = 15 * 1000;
+
+/** The refresh that is under way in this process, shared by every caller. */
+let refreshInFlight = null;
+
+function isAboutToExpire(token) {
+    return !!token.expires_at && Date.now() > token.expires_at - EXPIRY_MARGIN_MS;
+}
+
+/**
+ * Perform an API call, refreshing the access token when it is (about to be)
+ * expired or when the server rejects it, and retrying the request once.
+ *
+ * Pass a function returning the config when the request body is single-use
+ * (a FormData with a read stream): it is called again for the retry, so the
+ * retry does not send an already consumed stream.
+ *
+ * @param {import('axios').AxiosRequestConfig | (() => import('axios').AxiosRequestConfig)} configOrFactory
  * @returns {Promise<import('axios').AxiosResponse>}
  */
-export async function callApi(axiosConfig) {
+export async function callApi(configOrFactory) {
     let token = await getToken();
     if (!token) {
         throw new Error('Not logged in. Run "sitepack login" first.');
     }
 
-    // Ensure headers exist
-    axiosConfig.headers = axiosConfig.headers || {};
+    if (token.refresh_token && isAboutToExpire(token)) {
+        token = (await refreshAccessToken(token.access_token)) || token;
+    }
 
-    // Helper to apply token to headers
-    const applyToken = (t) => {
-        if (axiosConfig.headers['X-SitePack-Access-Token']) {
-            axiosConfig.headers['X-SitePack-Access-Token'] = t.access_token;
-        } else if (axiosConfig.headers['Authorization']) {
+    const buildConfig = (t) => {
+        const axiosConfig = typeof configOrFactory === 'function' ? configOrFactory() : configOrFactory;
+        axiosConfig.headers = axiosConfig.headers || {};
+
+        if (axiosConfig.headers['Authorization'] && !axiosConfig.headers['X-SitePack-Access-Token']) {
             axiosConfig.headers['Authorization'] = `Bearer ${t.access_token}`;
         } else {
-            // Default to SitePack header if none specified yet
             axiosConfig.headers['X-SitePack-Access-Token'] = t.access_token;
         }
+
+        return axiosConfig;
     };
 
-    applyToken(token);
-
     try {
-        return await axios(axiosConfig);
+        return await axios(buildConfig(token));
     } catch (error) {
-        if (error.response && error.response.status === 401) {
-            // Token might be expired, try refreshing
-            const newToken = await refreshToken();
-            if (newToken) {
-                applyToken(newToken);
-                // Retry the request once
-                try {
-                    return await axios(axiosConfig);
-                } catch (retryError) {
-                    throw retryError;
-                }
-            }
+        if (!isRejectedToken(error)) {
+            throw error;
         }
-        throw error;
+
+        const newToken = await refreshAccessToken(token.access_token);
+        if (!newToken) {
+            throw error;
+        }
+
+        return await axios(buildConfig(newToken));
     }
 }
 
 /**
- * Checks if the current access token is present and not locally expired.
- * @returns {Promise<boolean>}
+ * Replaces a rejected access token, making sure only one refresh runs at a
+ * time: Core rotates the refresh token on every use, so a second refresh with
+ * the same refresh token fails and would log the user out.
+ *
+ * Parallel requests in this process share one refresh, and a lock file keeps
+ * a second CLI process (e.g. a running theme:watch) from refreshing at the
+ * same moment. When the token on disk already differs from the rejected one,
+ * someone else refreshed it and that token is used as is.
+ *
+ * @param {string} rejectedAccessToken - the access token that was turned down
+ * @returns {Promise<object|null>} the new token data, or null when the session is gone
+ */
+async function refreshAccessToken(rejectedAccessToken) {
+    if (!refreshInFlight) {
+        refreshInFlight = withRefreshLock(async () => {
+            const current = await getToken();
+            if (current && current.access_token && current.access_token !== rejectedAccessToken) {
+                return current;
+            }
+
+            return await refreshToken();
+        }).finally(() => {
+            refreshInFlight = null;
+        });
+    }
+
+    return await refreshInFlight;
+}
+
+async function withRefreshLock(callback) {
+    const lockPath = `${getConfigPath()}.lock`;
+    const deadline = Date.now() + REFRESH_LOCK_TIMEOUT_MS;
+    let handle = null;
+
+    while (handle === null) {
+        try {
+            handle = await fs.open(lockPath, 'wx', 0o600);
+        } catch (error) {
+            if (error.code !== 'EEXIST') {
+                // No lock possible (e.g. read-only home): refresh unguarded.
+                return await callback();
+            }
+
+            if (Date.now() > deadline) {
+                // A crashed process left its lock behind.
+                await fs.remove(lockPath);
+                continue;
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+    }
+
+    try {
+        return await callback();
+    } finally {
+        await fs.close(handle);
+        await fs.remove(lockPath);
+    }
+}
+
+/**
+ * Exchanges the stored refresh token for a new access token and stores it.
+ * @returns {Promise<object|null>} the new token data, or null when the refresh failed
  */
 export async function refreshToken() {
     const token = await getToken();
@@ -198,8 +315,7 @@ export async function refreshToken() {
             return tokenData;
         }
     } catch (error) {
-        // If refresh fails, we might want to clear the token or just return null
-        // For now, let's just return null so the user is prompted to login again
+        // The refresh token is expired or already used: the user has to log in again.
         return null;
     }
     return null;
@@ -213,7 +329,7 @@ export async function isTokenValid() {
     
     if (token.expires_at && Date.now() > token.expires_at) {
         if (token.refresh_token) {
-            const newToken = await refreshToken();
+            const newToken = await refreshAccessToken(token.access_token);
             return !!(newToken && newToken.access_token);
         }
         return false;
