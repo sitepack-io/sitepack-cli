@@ -118,11 +118,11 @@ export default function(program) {
                 try {
                     // Build a fresh form per attempt — the read stream is single-use.
                     // One retry rides out a transient failure (e.g. HTTP 408).
-                    await withRetry(() => {
+                    await withRetry(() => callApi(() => {
                         const form = new FormData();
                         form.append('file', fs.createReadStream(filePath));
 
-                        return callApi({
+                        return {
                             method: 'post',
                             url: url,
                             data: form,
@@ -132,8 +132,8 @@ export default function(program) {
                                 'X-Partner-Uuid': partnerUuid,
                                 'X-SitePack-Partner': partnerUuid
                             }
-                        });
-                    }, { retries: 1 });
+                        };
+                    }), { retries: 1 });
                 } catch (err) {
                     // Bump the terminal / raise a popup, then abort the publish.
                     notifyFailure('SitePack publish failed', `Failed to sync ${relativePath}`);

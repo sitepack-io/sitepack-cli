@@ -1,11 +1,10 @@
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import path from 'path';
-import axios from 'axios';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import admZip from 'adm-zip';
-import { getToken, isTokenValid, getBaseUrl, getSelectedPartner } from '../utils/auth.js';
+import { isTokenValid, getBaseUrl, getSelectedPartner, callApi } from '../utils/auth.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
 
 export default function(program) {
@@ -29,16 +28,16 @@ export default function(program) {
                 return;
             }
 
-            const token = await getToken();
             const baseUrl = await getBaseUrl();
 
             // 3. List apps for the selected partner
             const spinner = ora('Fetching apps...').start();
             let apps = [];
             try {
-                const response = await axios.get(`${baseUrl}/api/console/apps/list`, {
+                const response = await callApi({
+                    method: 'get',
+                    url: `${baseUrl}/api/console/apps/list`,
                     headers: {
-                        'X-SitePack-Access-Token': token.access_token,
                         'X-SitePack-Partner': partnerUuid
                     }
                 });
@@ -75,12 +74,11 @@ export default function(program) {
             
             try {
                 const downloadUrl = `${baseUrl}/api/console/apps/${selectedAppUuid}/download`;
-                const response = await axios({
+                const response = await callApi({
                     method: 'get',
                     url: downloadUrl,
                     responseType: 'arraybuffer',
                     headers: {
-                        'X-SitePack-Access-Token': token.access_token,
                         'X-SitePack-Partner': partnerUuid
                     }
                 });

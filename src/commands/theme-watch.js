@@ -169,11 +169,11 @@ export default function(program) {
                     // The request body is single-use (a read stream), so build a
                     // fresh form on every attempt. One retry rides out a transient
                     // failure such as a timed-out request (HTTP 408).
-                    const response = await withRetry(() => {
+                    const response = await withRetry(() => callApi(() => {
                         const form = new FormData();
                         form.append('file', fs.createReadStream(filePath));
 
-                        return callApi({
+                        return {
                             method: 'post',
                             url: url,
                             data: form,
@@ -182,8 +182,8 @@ export default function(program) {
                                 'X-Theme-Uuid': uuid,
                                 'X-SitePack-Partner': partnerUuid
                             }
-                        });
-                    }, {
+                        };
+                    }), {
                         retries: 1,
                         onRetry: (err) => {
                             if (isDebug) {

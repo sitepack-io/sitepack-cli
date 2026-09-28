@@ -183,6 +183,112 @@ describe('sitepack auth', () => {
             );
         });
 
+        it('refreshes and retries when core rejects an expired token with a 400', async () => {
+            await saveToken({ access_token: 'old', refresh_token: 'r', client_id: 'c' });
+            axios
+                .mockRejectedValueOnce({ response: { status: 400, data: { status: 'error', message: 'Access token has expired' } } })
+                .mockResolvedValueOnce({ data: { ok: true } });
+            axios.post.mockResolvedValue({ data: { access_token: 'new', expires_in: 3600 } });
+
+            const response = await callApi({ method: 'get', url: 'https://x/y' });
+
+            expect(response.data).toEqual({ ok: true });
+            expect(axios).toHaveBeenLastCalledWith(
+                expect.objectContaining({ headers: { 'X-SitePack-Access-Token': 'new' } }),
+            );
+        });
+
+        it('does not refresh on an unrelated 400', async () => {
+            await saveToken({ access_token: 'abc', refresh_token: 'r', client_id: 'c' });
+            axios.mockRejectedValue({ response: { status: 400, data: { message: 'Theme name is required' } } });
+
+            await expect(callApi({ method: 'get', url: 'https://x/y' })).rejects.toMatchObject({
+                response: { status: 400 },
+            });
+            expect(axios.post).not.toHaveBeenCalled();
+        });
+
+        it('refreshes up front when the token is about to expire', async () => {
+            await saveToken({ access_token: 'old', refresh_token: 'r', client_id: 'c', expires_at: Date.now() + 10_000 });
+            axios.mockResolvedValue({ data: { ok: true } });
+            axios.post.mockResolvedValue({ data: { access_token: 'new', refresh_token: 'r2', expires_in: 3600 } });
+
+            await callApi({ method: 'get', url: 'https://x/y' });
+
+            expect(axios).toHaveBeenCalledTimes(1);
+            expect(axios).toHaveBeenCalledWith(
+                expect.objectContaining({ headers: { 'X-SitePack-Access-Token': 'new' } }),
+            );
+        });
+
+        it('shares one refresh between parallel rejected requests', async () => {
+            // Core rotates the refresh token, so a second refresh with it would fail.
+            await saveToken({ access_token: 'old', refresh_token: 'r', client_id: 'c' });
+            axios.mockImplementation(async (config) => {
+                if (config.headers['X-SitePack-Access-Token'] === 'old') {
+                    throw { response: { status: 400, data: { message: 'Access token has expired' } } };
+                }
+                return { data: { ok: true } };
+            });
+            axios.post.mockResolvedValue({ data: { access_token: 'new', refresh_token: 'r2', expires_in: 3600 } });
+
+            const responses = await Promise.all([1, 2, 3].map(() => callApi({ method: 'get', url: 'https://x/y' })));
+
+            expect(responses.map((r) => r.data)).toEqual([{ ok: true }, { ok: true }, { ok: true }]);
+            expect(axios.post).toHaveBeenCalledTimes(1);
+            expect((await getToken()).refresh_token).toBe('r2');
+        });
+
+        it('uses a token another process already refreshed instead of refreshing again', async () => {
+            await saveToken({ access_token: 'old', refresh_token: 'r', client_id: 'c' });
+            axios.mockImplementationOnce(async () => {
+                // Meanwhile a running theme:watch rotated the token on disk.
+                await saveToken({ access_token: 'fresh', refresh_token: 'r2' });
+                throw { response: { status: 401 } };
+            }).mockResolvedValueOnce({ data: { ok: true } });
+
+            await callApi({ method: 'get', url: 'https://x/y' });
+
+            expect(axios.post).not.toHaveBeenCalled();
+            expect(axios).toHaveBeenLastCalledWith(
+                expect.objectContaining({ headers: { 'X-SitePack-Access-Token': 'fresh' } }),
+            );
+        });
+
+        it('rebuilds a single-use request body for the retry', async () => {
+            await saveToken({ access_token: 'old', refresh_token: 'r', client_id: 'c' });
+            axios.mockRejectedValueOnce({ response: { status: 401 } }).mockResolvedValueOnce({ data: { ok: true } });
+            axios.post.mockResolvedValue({ data: { access_token: 'new', expires_in: 3600 } });
+            let built = 0;
+
+            await callApi(() => ({ method: 'post', url: 'https://x/y', data: `body-${++built}` }));
+
+            expect(built).toBe(2);
+            expect(axios).toHaveBeenLastCalledWith(expect.objectContaining({ data: 'body-2' }));
+        });
+
+        it('recognises an expired token in a binary (download) error body', async () => {
+            await saveToken({ access_token: 'old', refresh_token: 'r', client_id: 'c' });
+            axios
+                .mockRejectedValueOnce({ response: { status: 400, data: Buffer.from('{"message":"Access token not found"}') } })
+                .mockResolvedValueOnce({ data: Buffer.from('zip') });
+            axios.post.mockResolvedValue({ data: { access_token: 'new', expires_in: 3600 } });
+
+            await callApi({ method: 'get', url: 'https://x/y', responseType: 'arraybuffer' });
+
+            expect(axios.post).toHaveBeenCalledTimes(1);
+        });
+
+        it('leaves no refresh lock behind', async () => {
+            await saveToken({ access_token: 'old', refresh_token: 'r', client_id: 'c' });
+            axios.mockRejectedValueOnce({ response: { status: 401 } }).mockResolvedValueOnce({ data: { ok: true } });
+            axios.post.mockResolvedValue({ data: { access_token: 'new', expires_in: 3600 } });
+
+            await callApi({ method: 'get', url: 'https://x/y' });
+
+            expect(fs.existsSync(`${configPath()}.lock`)).toBe(false);
+        });
+
         it('gives up when the refresh also fails', async () => {
             await saveToken({ access_token: 'old', refresh_token: 'r', client_id: 'c' });
             axios.mockRejectedValue({ response: { status: 401 } });
