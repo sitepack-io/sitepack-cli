@@ -32,6 +32,8 @@ const chokidarModule = await import('chokidar');
 const chokidar = chokidarModule.default;
 const watcherMock = chokidarModule.__watcher;
 const { notifyFailure } = await import('../src/utils/notify.js');
+const { getSites, selectSite } = await import('../src/utils/sites.js');
+const { getSession } = await import('../src/mcp/session.js');
 
 let tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sitepack-home-'));
 
@@ -353,5 +355,76 @@ describe('sitepack theme:watch', () => {
         await runWatch();
 
         expect(axios).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The app API session the watch opens.
+     *
+     * `sitepack mcp` runs in a different process, started by an editor rather than by the
+     * developer, so the only way it can learn which site is being worked on - let alone
+     * authenticate for it - is what the watch leaves behind here.
+     */
+    describe('the development session it opens', () => {
+        const SITE = {
+            uuid: '019f0000-0000-7000-8000-0000000000aa',
+            name: 'SitePack',
+            domain: 'en-sitepack-bv.sitepack.app',
+        };
+
+        const withWatchedSite = (session) => {
+            getSites.mockResolvedValue([SITE]);
+            selectSite.mockResolvedValue(SITE.uuid);
+
+            axios.mockImplementation(async (config) => {
+                if (String(config.url).includes('/api/console/themes/watch-site')) {
+                    return { data: { status: 'success', ...(session ? { session } : {}) } };
+                }
+
+                return { data: { status: 'ok' } };
+            });
+        };
+
+        it('stores the token, the site and the staging URL for the MCP server', async () => {
+            withWatchedSite({
+                access_token: 'session-token-xyz',
+                expires: new Date(Date.now() + 3600_000).toISOString(),
+                scopes: ['content:staging', 'navigation:write'],
+            });
+
+            await runWatch();
+
+            const stored = await getSession(THEME_UUID);
+
+            expect(stored.access_token).toBe('session-token-xyz');
+            expect(stored.theme_dir).toBe(themeDir);
+            expect(stored.site.uuid).toBe(SITE.uuid);
+            expect(stored.site.staging.url).toBe('https://staging-en-sitepack-bv.sitepack.app');
+            expect(stored.scopes).toContain('content:staging');
+        });
+
+        /** A token is a secret: it never becomes world-readable in the home directory. */
+        it('keeps the session file to the owner', async () => {
+            withWatchedSite({
+                access_token: 'session-token-xyz',
+                expires: new Date(Date.now() + 3600_000).toISOString(),
+                scopes: ['content:staging'],
+            });
+
+            await runWatch();
+
+            const mode = fs.statSync(path.join(tempHome, '.sitepack', 'dev-sessions.json')).mode;
+
+            expect(mode & 0o077).toBe(0);
+        });
+
+        /** An older server does not offer one, and the watch still has to work. */
+        it('watches as usual when the server offers no session', async () => {
+            withWatchedSite(null);
+
+            await runWatch();
+
+            expect(await getSession(THEME_UUID)).toBeNull();
+            expect(chokidar.watch).toHaveBeenCalled();
+        });
     });
 });
