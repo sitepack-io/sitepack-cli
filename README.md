@@ -103,6 +103,16 @@ sitepack theme:init
 
 Follow the prompts to name your theme and initialize a Git repository.
 
+### Link an existing theme directory
+
+`theme:init` starts a new theme from the skeleton. Already have the source of a theme (a `theme.json` with its templates and assets), for example one you cloned or copied, but no theme for it in the partner dashboard? Link the directory instead:
+
+```bash
+sitepack theme:link path/to/my-theme
+```
+
+When the uuid in `theme.json` is empty or not a theme of your selected organization, you choose between registering a new theme (SitePack issues a new uuid) or linking it to one of your existing themes. The uuid is written back to `theme.json` (and an empty `author` is filled in), so `sitepack theme:watch` and `sitepack theme:publish` target that theme. Add `--new` to always register a new theme.
+
 ### Develop your theme
 
 To watch for changes in the theme directory and sync to SitePack, navigate to your theme directory and run:
@@ -144,7 +154,7 @@ For every theme directory (a sub-folder with a `theme.json`) it hashes the files
   atelier    ✔ in sync  v4  9aa4aa7
   cadence    ● 2 changed, 1 new  since v3  local 76df076 ≠ published 315b624  staging ✔
   supper     ○ never published
-  trailhead  – no uuid in theme.json (run "sitepack theme:init")
+  trailhead  – no uuid in theme.json (run "sitepack theme:link")
 ```
 
 `staging ✔` means `sitepack theme:watch` already synced the local files, but they are not published yet. Themes of another organisation are skipped. Add `--files` to list the changed files, `--json` for scripts, and `--exit-code` to exit with code 1 when a theme differs (for CI). Run it inside a single theme directory to check only that theme.
@@ -199,6 +209,7 @@ sitepack app:checkout
 | `sitepack app:checkout` | Pull an app from SitePack to edit files locally |
 | `sitepack app:link [directory]` | Link an existing app directory to SitePack (registers a new uuid when needed) |
 | `sitepack theme:init` | Start a new SitePack theme project |
+| `sitepack theme:link [directory]` | Link an existing theme directory to SitePack (registers a new uuid when needed) |
 | `sitepack theme:watch` | Watch for changes in the theme directory and sync to SitePack |
 | `sitepack theme:verify [directory]` | Check the theme against the SitePack requirements (offline) |
 | `sitepack theme:publish` | Publish the theme to SitePack (full sync and release) |

@@ -121,7 +121,7 @@ function checkThemeJson(root, report) {
     if (!theme.author) report(check, 'warning', `"author" is empty`, { file });
     if (!theme.version) report(check, 'warning', `"version" is empty (core falls back to 1.0.0)`, { file });
     if (!theme.uuid) {
-        report(check, 'warning', `"uuid" is empty`, { file, hint: 'run "sitepack theme:init" to register the theme before syncing' });
+        report(check, 'warning', `"uuid" is empty`, { file, hint: 'run "sitepack theme:link" to register the theme before syncing' });
     }
 
     const settings = Array.isArray(theme.settings) ? theme.settings : [];
