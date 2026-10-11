@@ -3,9 +3,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import axios from 'axios';
 import ora from 'ora';
-import { glob } from 'glob';
 import FormData from 'form-data';
-import ignore from 'ignore';
 import inquirer from 'inquirer';
 import { getToken, isTokenValid, getThemeCdnUrl, getSelectedPartner, callApi } from '../utils/auth.js';
 import { validateJsonFile } from '../utils/json.js';
@@ -13,6 +11,7 @@ import { ensurePartnerSelected } from '../utils/partners.js';
 import { describeApiError, readPublishedVersion } from '../utils/response.js';
 import { withRetry } from '../utils/retry.js';
 import { notifyFailure } from '../utils/notify.js';
+import { THEME_FILE_TYPES, listPublishableFiles, loadThemeIgnore } from '../utils/theme-files.js';
 
 export default function(program) {
     program
@@ -80,31 +79,8 @@ export default function(program) {
             // 5. Execute a full file sync
             const spinner = ora('Performing full file sync...').start();
             
-            const ig = ignore();
-            ig.add('.git');
-            ig.add('node_modules');
-            ig.add('.sitepackignore');
-            
-            const ignorePath = path.resolve(process.cwd(), '.sitepackignore');
-            if (await fs.pathExists(ignorePath)) {
-                const ignoreContent = await fs.readFile(ignorePath, 'utf8');
-                ig.add(ignoreContent);
-            }
-
-            const allowedTypes = {
-                'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
-                'gif': 'image/gif', 'svg': 'image/svg+xml', 'webp': 'image/webp',
-                'css': 'text/css', 'js': 'application/javascript', 'json': 'application/json',
-                'pdf': 'application/pdf', 'woff': 'font/woff', 'woff2': 'font/woff2',
-                'ttf': 'font/ttf', 'otf': 'font/otf', 'md': 'text/plain', 'twig': 'text/plain'
-            };
-
-            const allowedFolders = ['assets', 'config', 'layouts', 'snippets', 'templates', 'translations'];
-
-            // The server only accepts these at the theme root. Uploading anything
-            // else there (a README, or this CLI's own sitepack.config.json) is
-            // rejected, which used to abort the whole publish.
-            const allowedRootFiles = ['theme.json', 'themes.json'];
+            const ig = await loadThemeIgnore(process.cwd());
+            const allowedTypes = THEME_FILE_TYPES;
 
             const uploadFile = async (filePath) => {
                 const relativePath = path.relative(process.cwd(), filePath);
@@ -155,18 +131,8 @@ export default function(program) {
                     }
                 });
 
-                const files = await glob('**/*', { 
-                    nodir: true, 
-                    dot: true,
-                    ignore: ['node_modules/**', '.git/**'] 
-                });
-
-                const filteredFiles = files.filter(file => {
-                    if (ig.ignores(file)) return false;
-                    const parts = file.split(path.sep);
-                    if (parts.length === 1) return allowedRootFiles.includes(parts[0]);
-                    return allowedFolders.includes(parts[0]);
-                });
+                // The same selection themes:diff hashes, so the two agree on what a publish ships.
+                const filteredFiles = await listPublishableFiles(process.cwd());
 
                 // Validate JSON files before starting
                 for (const file of filteredFiles) {

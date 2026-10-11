@@ -17,6 +17,7 @@ import themeInitCommand from '../src/commands/theme-init.js';
 import themeWatchCommand from '../src/commands/theme-watch.js';
 import themePublishCommand from '../src/commands/theme-publish.js';
 import themeVerifyCommand from '../src/commands/theme-verify.js';
+import themesDiffCommand from '../src/commands/themes-diff.js';
 import partnerCommands from '../src/commands/partner.js';
 import { ensurePartnerSelected, getPartners } from '../src/utils/partners.js';
 
@@ -124,6 +125,7 @@ ${chalk.bold('themes')}
     ${chalk.cyan('theme:watch')}   - Watch for changes in the theme directory and sync to SitePack
     ${chalk.cyan('theme:verify')}  - Check the theme against the SitePack requirements (offline)
     ${chalk.cyan('theme:publish')} - Publish the theme to SitePack (full sync and release)
+    ${chalk.cyan('themes:diff')}   - Show which themes in a folder have unpublished changes
 
 ${chalk.bold('partners')}
     ${chalk.cyan('partner:organisations')}        - List all organizations you have access to
@@ -156,6 +158,7 @@ themeInitCommand(program);
 themeWatchCommand(program);
 themePublishCommand(program);
 themeVerifyCommand(program);
+themesDiffCommand(program);
 partnerCommands(program);
 
 // Check for updates (max once every 10 minutes)
