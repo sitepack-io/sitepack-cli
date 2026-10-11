@@ -5,6 +5,7 @@ import axios from 'axios';
 import ora from 'ora';
 import chokidar from 'chokidar';
 import ignore from 'ignore';
+import { THEME_FILE_TYPES, THEME_FOLDERS, THEME_ROOT_FILES } from '../utils/theme-files.js';
 import { glob } from 'glob';
 import FormData from 'form-data';
 import { getToken, isTokenValid, getBaseUrl, getThemeCdnUrl, getSelectedPartner, callApi } from '../utils/auth.js';
@@ -98,30 +99,9 @@ export default function(program) {
                 ig.add(ignoreContent);
             }
 
-            const allowedTypes = {
-                'png': 'image/png',
-                'jpg': 'image/jpeg',
-                'jpeg': 'image/jpeg',
-                'gif': 'image/gif',
-                'svg': 'image/svg+xml',
-                'webp': 'image/webp',
-                'css': 'text/css',
-                'js': 'application/javascript',
-                'json': 'application/json',
-                'pdf': 'application/pdf',
-                'woff': 'font/woff',
-                'woff2': 'font/woff2',
-                'ttf': 'font/ttf',
-                'otf': 'font/otf',
-                'md': 'text/plain',
-                'twig': 'text/plain'
-            };
-
-            const allowedFolders = ['assets', 'config', 'layouts', 'snippets', 'templates', 'translations'];
-
-            // The server only accepts these at the theme root; anything else there
-            // (a README, or this CLI's own sitepack.config.json) is rejected.
-            const allowedRootFiles = ['theme.json', 'themes.json'];
+            const allowedTypes = THEME_FILE_TYPES;
+            const allowedFolders = THEME_FOLDERS;
+            const allowedRootFiles = THEME_ROOT_FILES;
 
             /**
              * Whether a path belongs to the theme structure the server accepts.

@@ -130,6 +130,25 @@ It checks:
 
 Pass a path to verify another directory (`sitepack theme:verify path/to/theme`). Errors exit with code 1; add `--strict` to fail on warnings too, or `--json` for CI and scripts.
 
+### Find unpublished changes
+
+Working on several themes at once? Run this in the folder that holds them to see which ones have changes that are not published to SitePack yet:
+
+```bash
+sitepack themes:diff
+```
+
+For every theme directory (a sub-folder with a `theme.json`) it hashes the files `sitepack theme:publish` would upload and compares them with the version that is live, file by file:
+
+```text
+  atelier    ✔ in sync  v4  9aa4aa7
+  cadence    ● 2 changed, 1 new  since v3  local 76df076 ≠ published 315b624  staging ✔
+  supper     ○ never published
+  trailhead  – no uuid in theme.json (run "sitepack theme:init")
+```
+
+`staging ✔` means `sitepack theme:watch` already synced the local files, but they are not published yet. Themes of another organisation are skipped. Add `--files` to list the changed files, `--json` for scripts, and `--exit-code` to exit with code 1 when a theme differs (for CI). Run it inside a single theme directory to check only that theme.
+
 ### Bootstrap a new app
 
 To bootstrap a new SitePack app, run:
@@ -183,6 +202,7 @@ sitepack app:checkout
 | `sitepack theme:watch` | Watch for changes in the theme directory and sync to SitePack |
 | `sitepack theme:verify [directory]` | Check the theme against the SitePack requirements (offline) |
 | `sitepack theme:publish` | Publish the theme to SitePack (full sync and release) |
+| `sitepack themes:diff [directory]` | Show which themes in a folder have changes that are not published |
 | `sitepack partner:organisations` | List all organizations you have access to |
 | `sitepack partner:change-organisation` | Select a different organization to work with |
 | `sitepack partner:create-organisation` | Open the browser to create a new organization |
