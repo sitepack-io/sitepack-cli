@@ -16,6 +16,7 @@ import appLinkCommand from '../src/commands/app-link.js';
 import themeInitCommand from '../src/commands/theme-init.js';
 import themeWatchCommand from '../src/commands/theme-watch.js';
 import themePublishCommand from '../src/commands/theme-publish.js';
+import themeVerifyCommand from '../src/commands/theme-verify.js';
 import partnerCommands from '../src/commands/partner.js';
 import { ensurePartnerSelected, getPartners } from '../src/utils/partners.js';
 
@@ -121,6 +122,7 @@ ${chalk.bold('apps')}
 ${chalk.bold('themes')}
     ${chalk.cyan('theme:init')}    - Start a new SitePack theme project
     ${chalk.cyan('theme:watch')}   - Watch for changes in the theme directory and sync to SitePack
+    ${chalk.cyan('theme:verify')}  - Check the theme against the SitePack requirements (offline)
     ${chalk.cyan('theme:publish')} - Publish the theme to SitePack (full sync and release)
 
 ${chalk.bold('partners')}
@@ -153,13 +155,14 @@ appLinkCommand(program);
 themeInitCommand(program);
 themeWatchCommand(program);
 themePublishCommand(program);
+themeVerifyCommand(program);
 partnerCommands(program);
 
 // Check for updates (max once every 10 minutes)
 await checkForUpdates();
 
 // Check for authentication and show warning if not logged in
-const skipValidationCommands = [undefined, 'login', 'help', '--help', '-h', '--version', '-V', 'whoami', 'partner:organisations', 'partner:change-organisation'];
+const skipValidationCommands = [undefined, 'login', 'help', '--help', '-h', '--version', '-V', 'whoami', 'partner:organisations', 'partner:change-organisation', 'theme:verify'];
 const currentCommand = process.argv[2];
 
 if (!skipValidationCommands.includes(currentCommand)) {
