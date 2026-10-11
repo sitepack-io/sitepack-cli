@@ -14,6 +14,7 @@ import appPublishCommand from '../src/commands/app-publish.js';
 import appCheckoutCommand from '../src/commands/app-checkout.js';
 import appLinkCommand from '../src/commands/app-link.js';
 import themeInitCommand from '../src/commands/theme-init.js';
+import themeLinkCommand from '../src/commands/theme-link.js';
 import themeWatchCommand from '../src/commands/theme-watch.js';
 import themePublishCommand from '../src/commands/theme-publish.js';
 import themeVerifyCommand from '../src/commands/theme-verify.js';
@@ -122,6 +123,7 @@ ${chalk.bold('apps')}
 
 ${chalk.bold('themes')}
     ${chalk.cyan('theme:init')}    - Start a new SitePack theme project
+    ${chalk.cyan('theme:link')}    - Link an existing theme directory to SitePack (registers a new uuid)
     ${chalk.cyan('theme:watch')}   - Watch for changes in the theme directory and sync to SitePack
     ${chalk.cyan('theme:verify')}  - Check the theme against the SitePack requirements (offline)
     ${chalk.cyan('theme:publish')} - Publish the theme to SitePack (full sync and release)
@@ -155,6 +157,7 @@ appPublishCommand(program);
 appCheckoutCommand(program);
 appLinkCommand(program);
 themeInitCommand(program);
+themeLinkCommand(program);
 themeWatchCommand(program);
 themePublishCommand(program);
 themeVerifyCommand(program);

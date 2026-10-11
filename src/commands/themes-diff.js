@@ -200,7 +200,7 @@ function describe(r) {
         case 'unpublished':
             return chalk.yellow('○ never published') + staging;
         case 'unregistered':
-            return chalk.gray('– no uuid in theme.json (run "sitepack theme:init")');
+            return chalk.gray('– no uuid in theme.json (run "sitepack theme:link")');
         case 'no-access':
             return chalk.gray(`– ${r.message}`);
         case 'unsupported':
