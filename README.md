@@ -111,6 +111,25 @@ To watch for changes in the theme directory and sync to SitePack, navigate to yo
 sitepack theme:watch
 ```
 
+### Verify your theme
+
+Before you publish, check the theme against the SitePack requirements. It runs offline and needs no login:
+
+```bash
+sitepack theme:verify
+```
+
+It checks:
+- **Directory structure**: only the files and folders SitePack accepts on upload.
+- **theme.json**: settings, custom templates and fields that core can read (core silently drops invalid ones), `platform_colors` pointing at colour settings.
+- **Templates**: every page type the storefront renders, a home template (`index`), and the platform functions apps rely on (`sitepack_head()`, `sitepack_account()`, ...).
+- **App blocks**: every standard `{% app_block %}` hook, so installed apps show up.
+- **Translations**: `en`, `nl`, `de` and `es` with the same keys, and every key the templates use.
+- **Twig sandbox**: only tags, filters and functions that both publishing and rendering allow.
+- **Design rules** (warnings): no hardcoded colours or fonts, every CSS variable declared, `alt` on images.
+
+Pass a path to verify another directory (`sitepack theme:verify path/to/theme`). Errors exit with code 1; add `--strict` to fail on warnings too, or `--json` for CI and scripts.
+
 ### Bootstrap a new app
 
 To bootstrap a new SitePack app, run:
@@ -162,6 +181,7 @@ sitepack app:checkout
 | `sitepack app:link [directory]` | Link an existing app directory to SitePack (registers a new uuid when needed) |
 | `sitepack theme:init` | Start a new SitePack theme project |
 | `sitepack theme:watch` | Watch for changes in the theme directory and sync to SitePack |
+| `sitepack theme:verify [directory]` | Check the theme against the SitePack requirements (offline) |
 | `sitepack theme:publish` | Publish the theme to SitePack (full sync and release) |
 | `sitepack partner:organisations` | List all organizations you have access to |
 | `sitepack partner:change-organisation` | Select a different organization to work with |
