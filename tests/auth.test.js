@@ -9,6 +9,7 @@ vi.mock('open', () => ({ default: vi.fn() }));
 
 const axios = (await import('axios')).default;
 const open = (await import('open')).default;
+const { pollingStarted, poll } = await import('./helpers/device-login.js');
 
 // A real temporary home, so the config-file handling is exercised for real
 // rather than mocked away.
@@ -346,8 +347,8 @@ describe('sitepack auth', () => {
     });
 
     describe('performLogin', () => {
-        // Only the polling interval is faked: the test still needs real timers to
-        // let the pending request promises and config writes settle.
+        // Only the polling interval is faked: the config reads and writes around it run
+        // for real.
         beforeEach(() => {
             vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
             vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -356,15 +357,6 @@ describe('sitepack auth', () => {
         afterEach(() => {
             vi.useRealTimers();
         });
-
-        /** Hands the event loop back so pending promises settle. */
-        const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
-
-        /** Fires the next poll and waits for it to be handled. */
-        const poll = async () => {
-            vi.advanceTimersByTime(5_000);
-            await settle();
-        };
 
         const deviceCodeResponse = {
             data: {
@@ -391,9 +383,9 @@ describe('sitepack auth', () => {
                 });
 
             const login = performLogin();
-            await settle();
-            await poll(); // authorization_pending
-            await poll(); // approved
+            await pollingStarted();
+            poll(axios.post); // authorization_pending
+            poll(axios.post); // approved
             const token = await login;
 
             expect(token.access_token).toBe('access-1');
@@ -411,8 +403,8 @@ describe('sitepack auth', () => {
 
             const login = performLogin();
             const assertion = expect(login).rejects.toThrow('The user denied the request.');
-            await settle();
-            await poll();
+            await pollingStarted();
+            poll(axios.post);
             await assertion;
         });
 
@@ -423,8 +415,8 @@ describe('sitepack auth', () => {
 
             const login = performLogin();
             const assertion = expect(login).rejects.toThrow('The device code has expired.');
-            await settle();
-            await poll();
+            await pollingStarted();
+            poll(axios.post);
             await assertion;
         });
 
@@ -440,8 +432,8 @@ describe('sitepack auth', () => {
 
             const login = performLogin();
             const assertion = expect(login).rejects.toThrow(/HTTP 500/);
-            await settle();
-            await poll();
+            await pollingStarted();
+            poll(axios.post);
             await assertion;
         });
 
