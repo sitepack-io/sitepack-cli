@@ -13,6 +13,7 @@ vi.mock('inquirer', () => ({
 
 const axios = (await import('axios')).default;
 const inquirer = (await import('inquirer')).default;
+const { pollingStarted, poll } = await import('./helpers/device-login.js');
 
 let tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'sitepack-home-'));
 
@@ -56,12 +57,6 @@ describe('sitepack login', () => {
         fsExtra.removeSync(cwd);
     });
 
-    const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
-    const poll = async () => {
-        vi.advanceTimersByTime(5_000);
-        await settle();
-    };
-
     const deviceCodeResponse = {
         data: {
             client_id: 'server-client-id',
@@ -92,8 +87,8 @@ describe('sitepack login', () => {
         inquirer.prompt.mockResolvedValue({ partnerUuid: PARTNER.uuid });
 
         const login = run(loginCommand, 'login');
-        await settle();
-        await poll();
+        await pollingStarted();
+        poll(axios.post);
         await login;
 
         expect((await getToken()).access_token).toBe('access-1');
@@ -112,8 +107,8 @@ describe('sitepack login', () => {
         });
 
         const login = run(loginCommand, 'login');
-        await settle();
-        await poll();
+        await pollingStarted();
+        poll(axios.post);
         await login;
 
         // The login itself worked, so the token must survive.
@@ -127,8 +122,8 @@ describe('sitepack login', () => {
             .mockRejectedValueOnce({ response: { data: { error: 'access_denied' } } });
 
         const login = run(loginCommand, 'login');
-        await settle();
-        await poll();
+        await pollingStarted();
+        poll(axios.post);
         await login;
 
         expect(await getToken()).toBeNull();
