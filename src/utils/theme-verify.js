@@ -191,7 +191,7 @@ function checkRequiredApps(theme, file, report) {
 
     const apps = theme.requires_apps;
     if (!Array.isArray(apps)) {
-        report(check, 'error', `"requires_apps" must be a list of app uuids; devcdn refuses the upload`, { file, hint: '"requires_apps": ["01a16eb1-04f6-7f58-886c-44f6c364f899"]' });
+        report(check, 'error', `"requires_apps" must be a list of app uuids; devcdn refuses the upload`, { file, hint: '"requires_apps": ["01a16f31-f251-709b-8f40-27525d3f58b4"]' });
         return;
     }
 
