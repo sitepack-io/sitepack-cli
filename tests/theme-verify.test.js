@@ -222,6 +222,33 @@ describe('verifyTheme', () => {
         ]);
     });
 
+    it('accepts a list of required app uuids', () => {
+        edit(dir, 'theme.json', (s) => JSON.stringify({ ...JSON.parse(s), requires_apps: ['01a16eb1-04f6-7f58-886c-44f6c364f899'] }));
+
+        expect(verifyTheme(dir).findings).toEqual([]);
+    });
+
+    it('warns about invalid and duplicate required apps', () => {
+        edit(dir, 'theme.json', (s) => JSON.stringify({
+            ...JSON.parse(s),
+            requires_apps: ['01a16eb1-04f6-7f58-886c-44f6c364f899', 'portfolio', 42, '01A16EB1-04F6-7F58-886C-44F6C364F899'],
+        }));
+
+        expect(messages(verifyTheme(dir).findings, 'themeJson')).toEqual([
+            'error: requires_apps: "portfolio" is not an app uuid; devcdn refuses the upload',
+            'error: requires_apps: 42 is not an app uuid; devcdn refuses the upload',
+            'warning: requires_apps: 01A16EB1-04F6-7F58-886C-44F6C364F899 is listed twice',
+        ]);
+    });
+
+    it('requires requires_apps to be a list', () => {
+        edit(dir, 'theme.json', (s) => JSON.stringify({ ...JSON.parse(s), requires_apps: '01a16eb1-04f6-7f58-886c-44f6c364f899' }));
+
+        expect(messages(verifyTheme(dir).findings, 'themeJson')).toEqual([
+            'error: "requires_apps" must be a list of app uuids; devcdn refuses the upload',
+        ]);
+    });
+
     it('rejects files devcdn would refuse', () => {
         write(dir, 'assets/logo.png', '');
         write(dir, 'templates/README.md', '');

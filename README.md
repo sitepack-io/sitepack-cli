@@ -131,7 +131,7 @@ sitepack theme:verify
 
 It checks:
 - **Directory structure**: only the files and folders SitePack accepts on upload.
-- **theme.json**: settings, custom templates and fields that core can read (core silently drops invalid ones), `platform_colors` pointing at colour settings.
+- **theme.json**: settings, custom templates and fields that core can read (core silently drops invalid ones), `platform_colors` pointing at colour settings, `requires_apps` as a list of app uuids.
 - **Templates**: every page type the storefront renders, a home template (`index`), and the platform functions apps rely on (`sitepack_head()`, `sitepack_account()`, ...).
 - **App blocks**: every standard `{% app_block %}` hook, so installed apps show up.
 - **Translations**: `en`, `nl`, `de` and `es` with the same keys, and every key the templates use.
