@@ -17,6 +17,7 @@ import {
     FIELD_TYPES,
     PLATFORM_COLOR_KEYS,
     PLATFORM_CSS_VARIABLES,
+    UUID_PATTERN,
 } from './theme-requirements.js';
 
 /** The checks in the order they are reported. */
@@ -174,7 +175,36 @@ function checkThemeJson(root, report) {
         }
     }
 
+    checkRequiredApps(theme, file, report);
+
     return theme;
+}
+
+/**
+ * `requires_apps` lists the uuids of apps core installs when the theme is activated.
+ * Optional; when present it must be a list of app uuids (sitepack-devcdn ThemeManifestPolicy
+ * refuses anything else). A duplicate is harmless, so it is only a warning.
+ */
+function checkRequiredApps(theme, file, report) {
+    const check = 'themeJson';
+    if (theme === null || typeof theme !== 'object' || !('requires_apps' in theme)) return;
+
+    const apps = theme.requires_apps;
+    if (!Array.isArray(apps)) {
+        report(check, 'error', `"requires_apps" must be a list of app uuids; devcdn refuses the upload`, { file, hint: '"requires_apps": ["01a16eb1-04f6-7f58-886c-44f6c364f899"]' });
+        return;
+    }
+
+    const seen = new Set();
+    for (const uuid of apps) {
+        if (typeof uuid !== 'string' || !UUID_PATTERN.test(uuid)) {
+            report(check, 'error', `requires_apps: ${JSON.stringify(uuid)} is not an app uuid; devcdn refuses the upload`, { file, hint: 'use the uuid from the app\'s app.json' });
+            continue;
+        }
+        const key = uuid.toLowerCase();
+        if (seen.has(key)) report(check, 'warning', `requires_apps: ${uuid} is listed twice`, { file });
+        seen.add(key);
+    }
 }
 
 function checkTemplates(root, theme, twig, report) {

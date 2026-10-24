@@ -163,6 +163,9 @@ export const FIELD_TYPES = [
     'colour', 'text', 'textarea', 'image', 'media', 'file', 'list', 'font', 'options', 'pixels', 'icon', 'boolean',
 ];
 
+/** An app uuid as `requires_apps` lists it (core and devcdn accept any RFC 4122 uuid). */
+export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** The platform colours a theme may fill through `platform_colors` (sitepack-core ThemeConfig). */
 export const PLATFORM_COLOR_KEYS = [
     'main-color', 'main-color-text', 'secondary-color', 'secondary-color-text', 'link-color', 'link-active-color',
