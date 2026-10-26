@@ -12,7 +12,7 @@ import { getToken, isTokenValid, getBaseUrl, getThemeCdnUrl, getSelectedPartner,
 import { validateJsonFile } from '../utils/json.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
 import { getSites, selectSite } from '../utils/sites.js';
-import { describeApiError } from '../utils/response.js';
+import { describeApiError, readWarnings } from '../utils/response.js';
 import { withRetry } from '../utils/retry.js';
 import { notifyFailure } from '../utils/notify.js';
 
@@ -179,6 +179,9 @@ export default function(program) {
 
                     const feedback = response.data?.message || '';
                     console.log(chalk.green(`✓ Synced: ${relativePath}${feedback ? ` (${feedback})` : ''}`));
+                    readWarnings(response.data).forEach((warning) => {
+                        console.log(chalk.yellow(`  ! ${relativePath}: ${warning}`));
+                    });
                 } catch (err) {
                     if (isDebug && err.response) {
                         console.log(chalk.gray(`[DEBUG] Error response for ${relativePath}:`));

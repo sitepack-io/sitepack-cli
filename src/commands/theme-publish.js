@@ -8,7 +8,7 @@ import inquirer from 'inquirer';
 import { getToken, isTokenValid, getThemeCdnUrl, getSelectedPartner, callApi } from '../utils/auth.js';
 import { validateJsonFile } from '../utils/json.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
-import { describeApiError, readPublishedVersion } from '../utils/response.js';
+import { describeApiError, readPublishedVersion, readWarnings } from '../utils/response.js';
 import { withRetry } from '../utils/retry.js';
 import { notifyFailure } from '../utils/notify.js';
 import { THEME_FILE_TYPES, listPublishableFiles, loadThemeIgnore } from '../utils/theme-files.js';
@@ -82,6 +82,9 @@ export default function(program) {
             const ig = await loadThemeIgnore(process.cwd());
             const allowedTypes = THEME_FILE_TYPES;
 
+            // Advice from the server about accepted files; shown once the sync is done.
+            const warnings = [];
+
             const uploadFile = async (filePath) => {
                 const relativePath = path.relative(process.cwd(), filePath);
                 if (ig.ignores(relativePath)) return;
@@ -94,7 +97,7 @@ export default function(program) {
                 try {
                     // Build a fresh form per attempt — the read stream is single-use.
                     // One retry rides out a transient failure (e.g. HTTP 408).
-                    await withRetry(() => callApi(() => {
+                    const response = await withRetry(() => callApi(() => {
                         const form = new FormData();
                         form.append('file', fs.createReadStream(filePath));
 
@@ -110,6 +113,7 @@ export default function(program) {
                             }
                         };
                     }), { retries: 1 });
+                    readWarnings(response?.data).forEach((warning) => warnings.push(`${relativePath}: ${warning}`));
                 } catch (err) {
                     // Bump the terminal / raise a popup, then abort the publish.
                     notifyFailure('SitePack publish failed', `Failed to sync ${relativePath}`);
@@ -152,6 +156,7 @@ export default function(program) {
                     await uploadFile(filePath);
                 }
                 spinner.succeed(chalk.green('Full file sync completed.'));
+                warnings.forEach((warning) => console.log(chalk.yellow(`  ! ${warning}`)));
             } catch (err) {
                 spinner.fail(chalk.red('Sync failed: ' + describeApiError(err)));
                 return;

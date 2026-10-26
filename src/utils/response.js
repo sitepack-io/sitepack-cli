@@ -31,6 +31,21 @@ export function readPublishedVersion(data) {
 }
 
 /**
+ * Reads the advice the devcdn sends back with an accepted upload (for example a form input
+ * that is not optimal). It never blocks the upload; older servers send none.
+ *
+ * @param {any} data - the upload response body
+ * @returns {string[]}
+ */
+export function readWarnings(data) {
+    if (!Array.isArray(data?.warnings)) {
+        return [];
+    }
+
+    return data.warnings.filter((warning) => typeof warning === 'string' && warning.trim() !== '');
+}
+
+/**
  * Turns an axios error into a readable one-line message.
  *
  * A server error used to surface as a bare "Request failed with status code

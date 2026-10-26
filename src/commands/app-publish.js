@@ -10,7 +10,7 @@ import inquirer from 'inquirer';
 import { getToken, isTokenValid, getAppCdnUrl, getSelectedPartner, callApi } from '../utils/auth.js';
 import { validateJsonFile } from '../utils/json.js';
 import { ensurePartnerSelected } from '../utils/partners.js';
-import { describeApiError, readPublishedVersion } from '../utils/response.js';
+import { describeApiError, readPublishedVersion, readWarnings } from '../utils/response.js';
 
 export default function(program) {
     program
@@ -102,6 +102,9 @@ export default function(program) {
             const allowedFolders = ['templates', 'assets', 'translations'];
             const allowedRootFiles = ['app.json'];
 
+            // Advice from the server about accepted files; shown once the sync is done.
+            const warnings = [];
+
             const uploadFile = async (filePath) => {
                 const relativePath = path.relative(process.cwd(), filePath);
                 if (ig.ignores(relativePath)) return;
@@ -112,7 +115,7 @@ export default function(program) {
                 const url = `${appCdnUrl}/${uuid}/${relativePath}`.replace(/\\/g, '/');
 
                 // A factory, so a retry after a token refresh gets a fresh read stream.
-                await callApi(() => {
+                const response = await callApi(() => {
                     const form = new FormData();
                     form.append('file', fs.createReadStream(filePath));
 
@@ -128,6 +131,7 @@ export default function(program) {
                         }
                     };
                 });
+                readWarnings(response?.data).forEach((warning) => warnings.push(`${relativePath}: ${warning}`));
             };
 
             try {
@@ -175,6 +179,7 @@ export default function(program) {
                     await uploadFile(filePath);
                 }
                 spinner.succeed(chalk.green('Full file sync completed.'));
+                warnings.forEach((warning) => console.log(chalk.yellow(`  ! ${warning}`)));
             } catch (err) {
                 spinner.fail(chalk.red('Sync failed: ' + describeApiError(err)));
                 return;
