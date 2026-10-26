@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readPublishedVersion, describeApiError, readScopes } from '../src/utils/response.js';
+import { readPublishedVersion, describeApiError, readScopes, readWarnings } from '../src/utils/response.js';
 
 describe('readPublishedVersion', () => {
     it('reads the version field', () => {
@@ -97,5 +97,23 @@ describe('readScopes', () => {
         expect(readScopes({})).toEqual([]);
         expect(readScopes({ scope: '' })).toEqual([]);
         expect(readScopes(null)).toEqual([]);
+    });
+});
+
+describe('readWarnings', () => {
+    it('reads the warnings of an upload response', () => {
+        expect(readWarnings({ status: 'ok', warnings: ['one', 'two'] })).toEqual(['one', 'two']);
+    });
+
+    it.each([
+        ['an older server without warnings', { status: 'ok' }],
+        ['an empty body', null],
+        ['warnings that are not a list', { warnings: 'oops' }],
+    ])('returns nothing for %s', (_, body) => {
+        expect(readWarnings(body)).toEqual([]);
+    });
+
+    it('drops blank and non-string entries', () => {
+        expect(readWarnings({ warnings: ['ok', '  ', 3, null] })).toEqual(['ok']);
     });
 });
