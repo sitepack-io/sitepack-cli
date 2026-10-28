@@ -11,7 +11,6 @@ import logoutCommand from '../src/commands/logout.js';
 import whoamiCommand from '../src/commands/whoami.js';
 import appInitCommand from '../src/commands/app-init.js';
 import appPublishCommand from '../src/commands/app-publish.js';
-import appCheckoutCommand from '../src/commands/app-checkout.js';
 import appLinkCommand from '../src/commands/app-link.js';
 import themeInitCommand from '../src/commands/theme-init.js';
 import themeLinkCommand from '../src/commands/theme-link.js';
@@ -118,7 +117,6 @@ Usage: sitepack [command]
 ${chalk.bold('apps')}
     ${chalk.cyan('app:init')}      - Start a new SitePack app project
     ${chalk.cyan('app:publish')}   - Publish the app to SitePack (full sync and release)
-    ${chalk.cyan('app:checkout')}  - Pull an app from SitePack to edit files locally
     ${chalk.cyan('app:link')}      - Link an existing app directory to SitePack (registers a new uuid)
 
 ${chalk.bold('themes')}
@@ -154,7 +152,6 @@ logoutCommand(program);
 whoamiCommand(program);
 appInitCommand(program);
 appPublishCommand(program);
-appCheckoutCommand(program);
 appLinkCommand(program);
 themeInitCommand(program);
 themeLinkCommand(program);
