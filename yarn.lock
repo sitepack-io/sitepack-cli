@@ -228,11 +228,6 @@
     convert-source-map "^2.0.0"
     tinyrainbow "^3.1.0"
 
-adm-zip@^0.5.17:
-  version "0.5.17"
-  resolved "https://registry.npmjs.org/adm-zip/-/adm-zip-0.5.17.tgz"
-  integrity sha512-+Ut8d9LLqwEvHHJl1+PIHqoyDxFgVN847JTVM3Izi3xHDWPE4UtzzXysMZQs64DMcrJfBeS/uoEP4AD3HQHnQQ==
-
 ansi-escapes@^4.3.2:
   version "4.3.2"
   resolved "https://registry.npmjs.org/ansi-escapes/-/ansi-escapes-4.3.2.tgz"

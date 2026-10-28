@@ -167,7 +167,9 @@ To bootstrap a new SitePack app, run:
 sitepack app:init
 ```
 
-This will create a new app structure and a `package.json` file.
+This registers a new app in your selected organization and creates the app directory from the skeleton, with the new uuid in `app.json`. Apps are only created with the CLI, not in the partner dashboard.
+
+SitePack does not keep a copy of your source you can download again: keep the app directory yourself, for example in your own Git repository, just like a theme.
 
 ### Link an existing app directory
 
@@ -187,14 +189,6 @@ To publish your app to SitePack, run:
 sitepack app:publish
 ```
 
-### Checkout an app
-
-To pull an app from SitePack, run:
-
-```bash
-sitepack app:checkout
-```
-
 <p>&nbsp;</p>
 
 ## Commands
@@ -206,7 +200,6 @@ sitepack app:checkout
 | `sitepack whoami` | Show the currently logged in user |
 | `sitepack app:init` | Start a new SitePack app project |
 | `sitepack app:publish` | Publish the app to SitePack (full sync and release) |
-| `sitepack app:checkout` | Pull an app from SitePack to edit files locally |
 | `sitepack app:link [directory]` | Link an existing app directory to SitePack (registers a new uuid when needed) |
 | `sitepack theme:init` | Start a new SitePack theme project |
 | `sitepack theme:link [directory]` | Link an existing theme directory to SitePack (registers a new uuid when needed) |
